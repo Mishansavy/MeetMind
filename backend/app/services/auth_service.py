@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.schemas.user import RegisterRequest, LoginRequest
@@ -8,13 +9,14 @@ from app.utils.security import (
     verify_password,
     create_access_token,
     create_email_verification_token,
+    decode_token,
 )
 from app.services.email_service import send_verification_email
 
 
-def register_user(payload: RegisterRequest, db: Session) -> dict:
-    existing = db.query(User).filter(User.email == payload.email).first()
-    if existing:
+async def register_user(payload: RegisterRequest, db: AsyncSession) -> dict:
+    result = await db.execute(select(User).where(User.email == payload.email))
+    if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered.",
@@ -26,8 +28,8 @@ def register_user(payload: RegisterRequest, db: Session) -> dict:
         hashed_password=hash_password(payload.password),
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     token = create_email_verification_token(user.email)
     send_verification_email(user.email, token)
@@ -35,9 +37,7 @@ def register_user(payload: RegisterRequest, db: Session) -> dict:
     return {"message": "Registration successful. Please verify your email."}
 
 
-def verify_email(token: str, db: Session) -> dict:
-    from app.utils.security import decode_token
-
+async def verify_email(token: str, db: AsyncSession) -> dict:
     payload = decode_token(token)
     if not payload or payload.get("type") != "email_verify":
         raise HTTPException(
@@ -46,20 +46,22 @@ def verify_email(token: str, db: Session) -> dict:
         )
 
     email = payload.get("sub")
-    user = db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     if user.is_email_verified:
         return {"message": "Email already verified."}
 
     user.is_email_verified = True
-    db.commit()
+    await db.commit()
 
     return {"message": "Email verified. Awaiting admin approval."}
 
 
-def login_user(payload: LoginRequest, db: Session) -> dict:
-    user = db.query(User).filter(User.email == payload.email).first()
+async def login_user(payload: LoginRequest, db: AsyncSession) -> dict:
+    result = await db.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(

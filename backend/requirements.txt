@@ -1,6 +1,8 @@
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy[asyncio]
+asyncpg
+greenlet
 psycopg2-binary
 python-dotenv
 passlib[bcrypt]
@@ -10,3 +12,5 @@ python-multipart
 itsdangerous
 emails
 pydantic[email]
+pydantic-settings
+alembic

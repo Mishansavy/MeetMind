@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import api from "../api/axios";
+import { Loader2 } from "lucide-react";
+import { authApi } from "../api/auth";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -16,40 +21,94 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      await api.post("/auth/register", form);
+      await authApi.register(form);
       navigate("/pending-approval", {
         state: { message: "Check your email to verify your account." },
       });
     } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed.");
+      setError(err.response?.data?.detail || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded-xl shadow w-full max-w-md">
-        <h1 className="text-2xl font-semibold mb-6">Create your account</h1>
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input name="name" placeholder="Full name" value={form.name}
-            onChange={handleChange} required
-            className="w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <input name="email" type="email" placeholder="Email" value={form.email}
-            onChange={handleChange} required
-            className="w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <input name="password" type="password" placeholder="Password" value={form.password}
-            onChange={handleChange} required minLength={8}
-            className="w-full border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <button type="submit" disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            {loading ? "Registering..." : "Register"}
-          </button>
-        </form>
-        <p className="text-sm text-center mt-4">
-          Already have an account? <Link to="/login" className="text-blue-600">Login</Link>
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+      <div className="w-full max-w-sm animate-fade-in">
+        <div className="text-center mb-8">
+          <span className="text-2xl font-bold tracking-tight text-foreground">MeetMind</span>
+          <p className="text-sm text-muted-foreground mt-1">Team meeting intelligence</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Create your account</CardTitle>
+            <CardDescription>Join your team on MeetMind</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <p className="text-sm text-destructive bg-destructive/8 border border-destructive/20 rounded-md px-3 py-2">
+                  {error}
+                </p>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Full name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="Jane Smith"
+                  value={form.name}
+                  onChange={handleChange}
+                  required
+                  autoComplete="name"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading ? "Creating account…" : "Create account"}
+              </Button>
+            </form>
+
+            <p className="text-sm text-center text-muted-foreground mt-5">
+              Already have an account?{" "}
+              <Link to="/login" className="text-primary font-medium hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

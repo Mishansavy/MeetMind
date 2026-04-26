@@ -1,17 +1,23 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
+
 
 class RegisterRequest(BaseModel):
     name: str
     email: EmailStr
     password: str
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class UserResponse(BaseModel):
     id: int
@@ -20,6 +26,6 @@ class UserResponse(BaseModel):
     role: str
     is_email_verified: bool
     is_approved: bool
+    created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

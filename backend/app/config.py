@@ -1,4 +1,6 @@
+from pydantic import computed_field
 from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -13,7 +15,12 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     FRONTEND_URL: str
 
-    class Config:
-        env_file = ".env"
+    @computed_field
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        return self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    model_config = {"env_file": ".env"}
+
 
 settings = Settings()
