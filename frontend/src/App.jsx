@@ -7,6 +7,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import PendingApproval from "./pages/PendingApproval";
 import UserDashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import MeetingNotes from "./pages/user/MeetingNotes";
 
 export default function App() {
   return (
@@ -24,6 +25,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <UserDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/notes"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <MeetingNotes />
               </ProtectedRoute>
             }
           />

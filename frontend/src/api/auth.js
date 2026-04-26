@@ -1,8 +1,9 @@
 import api from "./axios";
 
 export const authApi = {
-  register: (payload) => api.post("/auth/register", payload),
-  login: (payload) => api.post("/auth/login", payload),
-  verifyEmail: (token) => api.get(`/auth/verify-email?token=${token}`),
-  me: () => api.get("/auth/me"),
+    register:    (payload) => api.post("/auth/register", payload),
+    login:       (payload) => api.post("/auth/login", payload),
+    verifyEmail: (token)   => api.get(`/auth/verify-email?token=${token}`),
+    me:          ()        => api.get("/auth/me"),
+    stats:       ()        => api.get("/auth/me/stats"),
 };
