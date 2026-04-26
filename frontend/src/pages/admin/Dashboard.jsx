@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-    Users, Clock, CheckCircle, Trash2, UserCheck, LayoutDashboard,
-} from "lucide-react";
+import { Users, Clock, CheckCircle, Trash2, UserCheck, LayoutDashboard } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import AppShell from "../../components/AppShell";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent } from "../../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/table";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogDescription, DialogClose,
@@ -56,7 +56,6 @@ function ConfirmDialog({ open, onOpenChange, title, description, onConfirm }) {
 export default function AdminDashboard() {
     const [pending, setPending] = useState([]);
     const [members, setMembers] = useState([]);
-    const [tab, setTab] = useState("pending");
     const [confirm, setConfirm] = useState(null);
 
     const fetchData = () => {
@@ -94,123 +93,120 @@ export default function AdminDashboard() {
                 </div>
 
                 <Card>
-                    <div className="flex border-b border-border">
-                        {[
-                            { key: "pending", label: "Pending", count: pending.length },
-                            { key: "members", label: "All Members", count: members.length },
-                        ].map(({ key, label, count }) => (
-                            <button
-                                key={key}
-                                onClick={() => setTab(key)}
-                                className={`px-5 py-3 text-sm font-medium transition-colors relative ${
-                                    tab === key
-                                        ? "text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
-                                        : "text-muted-foreground hover:text-foreground"
-                                }`}
-                            >
-                                {label}
-                                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${tab === key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                                    {count}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
+                    <CardHeader className="pb-0">
+                        <Tabs defaultValue="pending">
+                            <TabsList>
+                                <TabsTrigger value="pending">
+                                    Pending
+                                    {pending.length > 0 && (
+                                        <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                                            {pending.length}
+                                        </span>
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger value="members">
+                                    All Members
+                                    <span className="ml-1.5 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                                        {members.length}
+                                    </span>
+                                </TabsTrigger>
+                            </TabsList>
 
-                    <div className="overflow-x-auto">
-                        {tab === "pending" && (
-                            pending.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                                    <CheckCircle className="h-8 w-8 opacity-30" />
-                                    <p className="text-sm">No pending approvals</p>
-                                </div>
-                            ) : (
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-border bg-muted/40">
-                                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Name</th>
-                                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Email</th>
-                                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Registered</th>
-                                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pending.map((u) => (
-                                            <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-medium">{u.name}</td>
-                                                <td className="px-4 py-3 text-sm text-muted-foreground">{u.email}</td>
-                                                <td className="px-4 py-3 text-sm text-muted-foreground">
-                                                    {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
+                            <TabsContent value="pending">
+                                {pending.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+                                        <CheckCircle className="h-8 w-8 opacity-30" />
+                                        <p className="text-sm">No pending approvals</p>
+                                    </div>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Email</TableHead>
+                                                <TableHead>Registered</TableHead>
+                                                <TableHead>Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {pending.map((u) => (
+                                                <TableRow key={u.id}>
+                                                    <TableCell className="font-medium">{u.name}</TableCell>
+                                                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => handleApprove(u.id)}
+                                                                className="h-7 text-xs gap-1"
+                                                            >
+                                                                <UserCheck className="h-3 w-3" /> Approve
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => setConfirm({ id: u.id, name: u.name, action: "reject" })}
+                                                                className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" /> Reject
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="members">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Role</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {members.map((u) => (
+                                            <TableRow key={u.id}>
+                                                <TableCell className="font-medium">{u.name}</TableCell>
+                                                <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={u.role === "admin" ? "default" : "secondary"}>
+                                                        {u.role}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={u.is_approved ? "success" : "warning"}>
+                                                        {u.is_approved ? "Active" : "Pending"}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {u.role !== "admin" && (
                                                         <Button
-                                                            size="sm"
-                                                            onClick={() => handleApprove(u.id)}
-                                                            className="h-7 text-xs gap-1"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                            onClick={() => setConfirm({ id: u.id, name: u.name, action: "remove" })}
                                                         >
-                                                            <UserCheck className="h-3 w-3" /> Approve
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => setConfirm({ id: u.id, name: u.name, action: "reject" })}
-                                                            className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
-                                                        >
-                                                            <Trash2 className="h-3 w-3" /> Reject
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
                                         ))}
-                                    </tbody>
-                                </table>
-                            )
-                        )}
-
-                        {tab === "members" && (
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/40">
-                                        <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Name</th>
-                                        <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Email</th>
-                                        <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Role</th>
-                                        <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5 uppercase tracking-wide">Status</th>
-                                        <th className="px-4 py-2.5" />
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {members.map((u) => (
-                                        <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                                            <td className="px-4 py-3 text-sm font-medium">{u.name}</td>
-                                            <td className="px-4 py-3 text-sm text-muted-foreground">{u.email}</td>
-                                            <td className="px-4 py-3">
-                                                <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                                                    {u.role}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge variant={u.is_approved ? "success" : "warning"}>
-                                                    {u.is_approved ? "Active" : "Pending"}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {u.role !== "admin" && (
-                                                    <Button
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => setConfirm({ id: u.id, name: u.name, action: "remove" })}
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
+                                    </TableBody>
+                                </Table>
+                            </TabsContent>
+                        </Tabs>
+                    </CardHeader>
                 </Card>
             </div>
 
