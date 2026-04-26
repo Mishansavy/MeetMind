@@ -22,7 +22,7 @@ def create_access_token(subject: str) -> str:
 
 def create_email_verification_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
-        hours=settings.EMAIL_VERIFICATOIN_EXPIRE_HOURS
+        hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS
     )
     payload = {"sub": email, "type": "email_verify", "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
