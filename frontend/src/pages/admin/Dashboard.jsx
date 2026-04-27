@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { Users, Clock, CheckCircle, Trash2, UserCheck, LayoutDashboard } from "lucide-react";
+import {
+    Users, Clock, CheckCircle, Trash2, UserCheck,
+    LayoutDashboard, Mail, Calendar, ShieldCheck, UserCircle,
+} from "lucide-react";
 import { adminApi } from "../../api/admin";
-import AppShell from "../../components/AppShell";
+import AdminShell from "../../components/AdminShell";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/table";
@@ -11,6 +14,10 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogDescription, DialogClose,
 } from "../../components/ui/dialog";
+import {
+    Sheet, SheetContent, SheetHeader, SheetTitle,
+    SheetDescription, SheetBody, SheetFooter, SheetClose,
+} from "../../components/ui/sheet";
 
 function StatCard({ label, value, icon: Icon, color }) {
     return (
@@ -53,10 +60,99 @@ function ConfirmDialog({ open, onOpenChange, title, description, onConfirm }) {
     );
 }
 
+function DetailRow({ icon: Icon, label, value }) {
+    return (
+        <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
+            <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-sm font-medium mt-0.5">{value}</p>
+            </div>
+        </div>
+    );
+}
+
+function MemberSheet({ member, open, onOpenChange, onApprove, onRemove }) {
+    if (!member) return null;
+
+    return (
+        <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent>
+                <SheetHeader>
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-semibold text-sm shrink-0">
+                            {member.name?.[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                            <SheetTitle>{member.name}</SheetTitle>
+                            <SheetDescription>{member.email}</SheetDescription>
+                        </div>
+                    </div>
+                </SheetHeader>
+
+                <SheetBody>
+                    <div className="flex items-center gap-2 mb-5">
+                        <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                            {member.role}
+                        </Badge>
+                        <Badge variant={member.is_approved ? "success" : "warning"}>
+                            {member.is_approved ? "Active" : "Pending approval"}
+                        </Badge>
+                    </div>
+
+                    <div className="rounded-lg border border-border overflow-hidden">
+                        <DetailRow icon={UserCircle} label="Full name" value={member.name} />
+                        <DetailRow icon={Mail} label="Email address" value={member.email} />
+                        <DetailRow icon={ShieldCheck} label="Role" value={member.role} />
+                        <DetailRow
+                            icon={CheckCircle}
+                            label="Account status"
+                            value={member.is_approved ? "Approved" : "Pending admin approval"}
+                        />
+                        <DetailRow
+                            icon={Calendar}
+                            label="Joined"
+                            value={new Date(member.created_at).toLocaleDateString("en-US", {
+                                weekday: "short", month: "long", day: "numeric", year: "numeric",
+                            })}
+                        />
+                    </div>
+                </SheetBody>
+
+                {member.role !== "admin" && (
+                    <SheetFooter>
+                        {!member.is_approved && (
+                            <Button
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={() => { onApprove(member.id); onOpenChange(false); }}
+                            >
+                                <UserCheck className="h-3.5 w-3.5" /> Approve
+                            </Button>
+                        )}
+                        <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1.5"
+                            onClick={() => { onRemove(member.id); onOpenChange(false); }}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" /> Remove member
+                        </Button>
+                    </SheetFooter>
+                )}
+            </SheetContent>
+        </Sheet>
+    );
+}
+
 export default function AdminDashboard() {
     const [pending, setPending] = useState([]);
     const [members, setMembers] = useState([]);
     const [confirm, setConfirm] = useState(null);
+    const [selectedMember, setSelectedMember] = useState(null);
+    const [sheetOpen, setSheetOpen] = useState(false);
 
     const fetchData = () => {
         adminApi.getPending().then((r) => setPending(r.data)).catch(() => {});
@@ -71,14 +167,19 @@ export default function AdminDashboard() {
     const handleRemove = (id) =>
         adminApi.removeUser(id).then(fetchData).catch(() => {});
 
+    const openDetail = (member) => {
+        setSelectedMember(member);
+        setSheetOpen(true);
+    };
+
     const approved = members.filter((m) => m.is_approved);
 
     return (
-        <AppShell>
+        <AdminShell>
             <div className="mb-7">
                 <div className="flex items-center gap-2 mb-1">
                     <LayoutDashboard className="h-5 w-5 text-muted-foreground" />
-                    <h1 className="text-xl font-semibold">Admin Dashboard</h1>
+                    <h1 className="text-xl font-semibold">Dashboard</h1>
                 </div>
                 <p className="text-sm text-muted-foreground pl-7">
                     Manage members and review pending approvals.
@@ -93,26 +194,31 @@ export default function AdminDashboard() {
                 </div>
 
                 <Card>
-                    <CardHeader className="pb-0">
+                    <CardContent className="p-0">
                         <Tabs defaultValue="pending">
-                            <TabsList>
-                                <TabsTrigger value="pending">
-                                    Pending
-                                    {pending.length > 0 && (
-                                        <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                                            {pending.length}
-                                        </span>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="members">
-                                    All Members
-                                    <span className="ml-1.5 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
-                                        {members.length}
-                                    </span>
-                                </TabsTrigger>
-                            </TabsList>
+                            <div className="px-4 pt-4 pb-0 border-b border-border">
+                                <TabsList className="bg-transparent p-0 h-auto gap-0 rounded-none w-auto">
+                                    {[
+                                        { value: "pending", label: "Pending", count: pending.length, showCount: true },
+                                        { value: "members", label: "All Members", count: members.length, showCount: false },
+                                    ].map(({ value, label, count, showCount }) => (
+                                        <TabsTrigger
+                                            key={value}
+                                            value={value}
+                                            className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-0 data-[state=active]:border-slate-900 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground"
+                                        >
+                                            {label}
+                                            {count > 0 && (
+                                                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${showCount && count > 0 ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>
+                                                    {count}
+                                                </span>
+                                            )}
+                                        </TabsTrigger>
+                                    ))}
+                                </TabsList>
+                            </div>
 
-                            <TabsContent value="pending">
+                            <TabsContent value="pending" className="mt-0">
                                 {pending.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
                                         <CheckCircle className="h-8 w-8 opacity-30" />
@@ -130,13 +236,17 @@ export default function AdminDashboard() {
                                         </TableHeader>
                                         <TableBody>
                                             {pending.map((u) => (
-                                                <TableRow key={u.id}>
+                                                <TableRow
+                                                    key={u.id}
+                                                    className="cursor-pointer"
+                                                    onClick={() => openDetail(u)}
+                                                >
                                                     <TableCell className="font-medium">{u.name}</TableCell>
                                                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                                                     <TableCell className="text-muted-foreground">
                                                         {new Date(u.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell onClick={(e) => e.stopPropagation()}>
                                                         <div className="flex items-center gap-2">
                                                             <Button
                                                                 size="sm"
@@ -162,7 +272,7 @@ export default function AdminDashboard() {
                                 )}
                             </TabsContent>
 
-                            <TabsContent value="members">
+                            <TabsContent value="members" className="mt-0">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -175,8 +285,19 @@ export default function AdminDashboard() {
                                     </TableHeader>
                                     <TableBody>
                                         {members.map((u) => (
-                                            <TableRow key={u.id}>
-                                                <TableCell className="font-medium">{u.name}</TableCell>
+                                            <TableRow
+                                                key={u.id}
+                                                className="cursor-pointer"
+                                                onClick={() => openDetail(u)}
+                                            >
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="h-7 w-7 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                                                            {u.name?.[0]?.toUpperCase()}
+                                                        </div>
+                                                        <span className="font-medium">{u.name}</span>
+                                                    </div>
+                                                </TableCell>
                                                 <TableCell className="text-muted-foreground">{u.email}</TableCell>
                                                 <TableCell>
                                                     <Badge variant={u.role === "admin" ? "default" : "secondary"}>
@@ -188,7 +309,7 @@ export default function AdminDashboard() {
                                                         {u.is_approved ? "Active" : "Pending"}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                     {u.role !== "admin" && (
                                                         <Button
                                                             size="icon"
@@ -206,9 +327,17 @@ export default function AdminDashboard() {
                                 </Table>
                             </TabsContent>
                         </Tabs>
-                    </CardHeader>
+                    </CardContent>
                 </Card>
             </div>
+
+            <MemberSheet
+                member={selectedMember}
+                open={sheetOpen}
+                onOpenChange={setSheetOpen}
+                onApprove={handleApprove}
+                onRemove={(id) => setConfirm({ id, name: selectedMember?.name, action: "remove" })}
+            />
 
             {confirm && (
                 <ConfirmDialog
@@ -219,6 +348,6 @@ export default function AdminDashboard() {
                     onConfirm={() => handleRemove(confirm.id)}
                 />
             )}
-        </AppShell>
+        </AdminShell>
     );
 }

@@ -7,6 +7,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import PendingApproval from "./pages/PendingApproval";
 import UserDashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import AdminMembers from "./pages/admin/Members";
 import MeetingNotes from "./pages/user/MeetingNotes";
 
 export default function App() {
@@ -41,6 +42,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/members"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminMembers />
               </ProtectedRoute>
             }
           />
