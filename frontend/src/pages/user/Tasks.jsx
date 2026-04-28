@@ -13,6 +13,13 @@ import { cn } from "../../lib/utils";
 
 const PRIORITY_VARIANT = { low: "secondary", medium: "warning", high: "destructive" };
 
+function UrgencyBadge({ score }) {
+    if (score == null) return <span className="text-muted-foreground/40">—</span>;
+    if (score < 0.1) return <Badge variant="success">Low</Badge>;
+    if (score < 0.3) return <Badge variant="warning">Medium</Badge>;
+    return <Badge variant="destructive">High</Badge>;
+}
+
 function NewTaskDialog({ open, onOpenChange, onCreated }) {
     const [form, setForm] = useState({ title: "", assignee_name: "", deadline: "", priority: "medium" });
     const [loading, setLoading] = useState(false);
@@ -171,6 +178,7 @@ export default function Tasks() {
                                     <TableHead>Assignee</TableHead>
                                     <TableHead>Deadline</TableHead>
                                     <TableHead>Priority</TableHead>
+                                    <TableHead>Urgency</TableHead>
                                     <TableHead />
                                 </TableRow>
                             </TableHeader>
@@ -207,6 +215,9 @@ export default function Tasks() {
                                             <Badge variant={PRIORITY_VARIANT[task.priority]} className="capitalize">
                                                 {task.priority}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <UrgencyBadge score={task.urgency_score} />
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <Button

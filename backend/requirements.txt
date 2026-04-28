@@ -15,3 +15,5 @@ pydantic[email]
 pydantic-settings
 alembic
 pymupdf
+spacy
+apscheduler

@@ -1,16 +1,24 @@
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task
 from app.schemas.task import TaskCreate, TaskUpdate, ExtractedTaskPreview
+from app.services.nlp_service import urgency_score as compute_urgency
+
+
+async def _pending_count(user_id: int, db: AsyncSession) -> int:
+    count = await db.scalar(
+        select(func.count()).where(Task.user_id == user_id, Task.is_complete.is_(False))
+    )
+    return count or 0
 
 
 async def list_tasks(user_id: int, db: AsyncSession) -> list[Task]:
     result = await db.execute(
         select(Task)
         .where(Task.user_id == user_id)
-        .order_by(Task.is_complete.asc(), Task.created_at.desc())
+        .order_by(Task.is_complete.asc(), Task.urgency_score.desc().nulls_last(), Task.created_at.desc())
     )
     return result.scalars().all()
 
@@ -26,6 +34,8 @@ async def get_task(task_id: int, user_id: int, db: AsyncSession) -> Task:
 
 
 async def create_task(user_id: int, payload: TaskCreate, db: AsyncSession) -> Task:
+    workload = await _pending_count(user_id, db)
+    score = compute_urgency(payload.deadline, workload)
     task = Task(
         user_id=user_id,
         meeting_note_id=payload.meeting_note_id,
@@ -33,6 +43,7 @@ async def create_task(user_id: int, payload: TaskCreate, db: AsyncSession) -> Ta
         assignee_name=payload.assignee_name,
         deadline=payload.deadline,
         priority=payload.priority,
+        urgency_score=score,
     )
     db.add(task)
     await db.commit()
@@ -44,6 +55,10 @@ async def update_task(task_id: int, user_id: int, payload: TaskUpdate, db: Async
     task = await get_task(task_id, user_id, db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(task, field, value)
+    # Recompute urgency if deadline changed
+    if "deadline" in payload.model_dump(exclude_unset=True):
+        workload = await _pending_count(user_id, db)
+        task.urgency_score = compute_urgency(task.deadline, workload)
     await db.commit()
     await db.refresh(task)
     return task
@@ -61,6 +76,7 @@ async def bulk_save_tasks(
     previews: list[ExtractedTaskPreview],
     db: AsyncSession,
 ) -> list[Task]:
+    workload = await _pending_count(user_id, db)
     tasks = [
         Task(
             user_id=user_id,
@@ -69,8 +85,9 @@ async def bulk_save_tasks(
             assignee_name=p.assignee_name,
             deadline=p.deadline,
             priority=p.priority,
+            urgency_score=compute_urgency(p.deadline, workload + i),
         )
-        for p in previews
+        for i, p in enumerate(previews)
     ]
     db.add_all(tasks)
     await db.commit()
