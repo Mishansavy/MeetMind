@@ -10,6 +10,7 @@ from app.config import settings
 from app.database import Base
 import app.models.user  # noqa: F401
 import app.models.meeting  # noqa: F401
+import app.models.task  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.ASYNC_DATABASE_URL)

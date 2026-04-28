@@ -37,11 +37,15 @@ async def me_stats(
     current_user: User = Depends(get_current_user),
 ):
     from app.models.meeting import MeetingNote
+    from app.models.task import Task
 
     notes_count = await db.scalar(
         select(func.count()).where(MeetingNote.user_id == current_user.id)
     )
+    tasks_pending = await db.scalar(
+        select(func.count()).where(Task.user_id == current_user.id, Task.is_complete.is_(False))
+    )
     return {
         "meetings": notes_count or 0,
-        "tasks_pending": 0,  # wired up in Phase 2 when Task model exists
+        "tasks_pending": tasks_pending or 0,
     }

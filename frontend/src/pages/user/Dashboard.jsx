@@ -123,10 +123,11 @@ export default function UserDashboard() {
                             to="/dashboard/notes"
                             color="bg-violet-50 text-violet-600"
                         />
-                        <ComingSoonCard
+                        <QuickAction
                             icon={CheckSquare}
                             title="Tasks"
-                            description="Track action items extracted from your notes. Due dates and priority scoring."
+                            description="Track action items from your notes. Set assignees, deadlines, and priorities."
+                            to="/dashboard/tasks"
                             color="bg-amber-50 text-amber-600"
                         />
                         <ComingSoonCard

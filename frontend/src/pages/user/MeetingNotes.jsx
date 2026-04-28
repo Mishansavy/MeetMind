@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import { FileText, Plus, Trash2, Upload, AlignLeft, FileUp } from "lucide-react";
+import { FileText, Plus, Trash2, Upload, AlignLeft, FileUp, Zap, Check } from "lucide-react";
 import { meetingsApi } from "../../api/meetings";
+import { tasksApi } from "../../api/tasks";
 import AppShell from "../../components/AppShell";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -10,8 +11,11 @@ import { Badge } from "../../components/ui/badge";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
 } from "../../components/ui/dialog";
+import { cn } from "../../lib/utils";
 
-function NoteList({ notes, selectedId, onSelect, onDelete }) {
+const PRIORITY_VARIANT = { low: "secondary", medium: "warning", high: "destructive" };
+
+function NoteList({ notes, selectedId, onSelect }) {
     if (notes.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2">
@@ -45,7 +49,120 @@ function NoteList({ notes, selectedId, onSelect, onDelete }) {
     );
 }
 
-function NoteDetail({ note, onDelete }) {
+function ExtractDialog({ note, open, onOpenChange, onSaved }) {
+    const [previews, setPreviews] = useState([]);
+    const [selected, setSelected] = useState(new Set());
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!open || !note) return;
+        setLoading(true);
+        setError("");
+        tasksApi.extractFromNote(note.id)
+            .then((r) => {
+                setPreviews(r.data);
+                setSelected(new Set(r.data.map((_, i) => i)));
+            })
+            .catch(() => setError("Extraction failed."))
+            .finally(() => setLoading(false));
+    }, [open, note]);
+
+    const toggleAll = () => {
+        setSelected(selected.size === previews.length ? new Set() : new Set(previews.map((_, i) => i)));
+    };
+
+    const toggle = (i) => {
+        const next = new Set(selected);
+        next.has(i) ? next.delete(i) : next.add(i);
+        setSelected(next);
+    };
+
+    const handleSave = async () => {
+        const chosen = previews.filter((_, i) => selected.has(i));
+        if (!chosen.length) return;
+        setSaving(true);
+        try {
+            await tasksApi.bulkSave(note.id, chosen);
+            onSaved();
+            onOpenChange(false);
+        } catch {
+            setError("Failed to save tasks.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Extract tasks from note</DialogTitle>
+                </DialogHeader>
+
+                {loading && (
+                    <div className="py-8 text-center text-sm text-muted-foreground">Scanning for action items…</div>
+                )}
+
+                {!loading && error && <p className="text-sm text-destructive">{error}</p>}
+
+                {!loading && !error && previews.length === 0 && (
+                    <div className="py-8 text-center text-sm text-muted-foreground">No action items detected in this note.</div>
+                )}
+
+                {!loading && previews.length > 0 && (
+                    <>
+                        <div className="flex items-center justify-between mb-2 mt-1">
+                            <p className="text-xs text-muted-foreground">{previews.length} action items found</p>
+                            <button onClick={toggleAll} className="text-xs text-primary hover:underline">
+                                {selected.size === previews.length ? "Deselect all" : "Select all"}
+                            </button>
+                        </div>
+                        <ul className="space-y-2 max-h-72 overflow-y-auto">
+                            {previews.map((p, i) => (
+                                <li
+                                    key={i}
+                                    onClick={() => toggle(i)}
+                                    className={cn(
+                                        "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                                        selected.has(i) ? "border-primary/40 bg-primary/5" : "border-border"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "mt-0.5 h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
+                                        selected.has(i) ? "bg-primary border-primary text-white" : "border-border"
+                                    )}>
+                                        {selected.has(i) && <Check className="h-2.5 w-2.5" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium">{p.title}</p>
+                                    </div>
+                                    <Badge variant={PRIORITY_VARIANT[p.priority]} className="capitalize shrink-0">
+                                        {p.priority}
+                                    </Badge>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                )}
+
+                <div className="flex justify-end gap-2 mt-2">
+                    <DialogClose asChild>
+                        <Button variant="outline" size="sm">Cancel</Button>
+                    </DialogClose>
+                    {previews.length > 0 && (
+                        <Button size="sm" disabled={saving || selected.size === 0} onClick={handleSave}>
+                            {saving ? "Saving…" : `Save ${selected.size} task${selected.size !== 1 ? "s" : ""}`}
+                        </Button>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function NoteDetail({ note, onDelete, onExtract }) {
     if (!note) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
@@ -66,14 +183,24 @@ function NoteDetail({ note, onDelete }) {
                         <Badge variant={note.source === "pdf" ? "secondary" : "outline"} className="text-xs">{note.source}</Badge>
                     </p>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => onDelete(note.id)}
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs"
+                        onClick={() => onExtract(note)}
+                    >
+                        <Zap className="h-3.5 w-3.5" /> Extract tasks
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => onDelete(note.id)}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
             <div className="flex-1 overflow-y-auto">
                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{note.content}</p>
@@ -206,6 +333,7 @@ export default function MeetingNotes() {
     const [notes, setNotes] = useState([]);
     const [selected, setSelected] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [extractNote, setExtractNote] = useState(null);
 
     const fetchNotes = () =>
         meetingsApi.list().then((r) => setNotes(r.data)).catch(() => {});
@@ -243,13 +371,16 @@ export default function MeetingNotes() {
                         notes={notes}
                         selectedId={selected?.id}
                         onSelect={setSelected}
-                        onDelete={handleDelete}
                     />
                 </Card>
 
                 <Card>
                     <CardContent className="p-5 h-full">
-                        <NoteDetail note={selected} onDelete={handleDelete} />
+                        <NoteDetail
+                            note={selected}
+                            onDelete={handleDelete}
+                            onExtract={setExtractNote}
+                        />
                     </CardContent>
                 </Card>
             </div>
@@ -258,6 +389,13 @@ export default function MeetingNotes() {
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 onCreated={handleCreated}
+            />
+
+            <ExtractDialog
+                note={extractNote}
+                open={!!extractNote}
+                onOpenChange={(v) => { if (!v) setExtractNote(null); }}
+                onSaved={() => {}}
             />
         </AppShell>
     );
