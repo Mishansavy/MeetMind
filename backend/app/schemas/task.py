@@ -31,6 +31,7 @@ class TaskResponse(BaseModel):
     deadline: Optional[date]
     priority: TaskPriority
     is_complete: bool
+    urgency_score: Optional[float]
     created_at: datetime
     updated_at: datetime
 
@@ -42,6 +43,7 @@ class ExtractedTaskPreview(BaseModel):
     assignee_name: Optional[str] = None
     deadline: Optional[date] = None
     priority: TaskPriority = TaskPriority.medium
+    urgency_score: Optional[float] = None
 
 
 class BulkSaveRequest(BaseModel):
