@@ -10,6 +10,7 @@ import AdminDashboard from "./pages/admin/Dashboard";
 import AdminMembers from "./pages/admin/Members";
 import MeetingNotes from "./pages/user/MeetingNotes";
 import Tasks from "./pages/user/Tasks";
+import Analytics from "./pages/user/Analytics";
 
 export default function App() {
   return (
@@ -43,6 +44,14 @@ export default function App() {
             element={
               <ProtectedRoute requiredRole="user">
                 <Tasks />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/analytics"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <Analytics />
               </ProtectedRoute>
             }
           />

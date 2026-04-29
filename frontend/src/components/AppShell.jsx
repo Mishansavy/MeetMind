@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-    LayoutDashboard, FileText, CheckSquare, LogOut, Menu, X,
+    LayoutDashboard, FileText, CheckSquare, BarChart2, LogOut, Menu, X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "./ui/button";
@@ -10,7 +10,8 @@ import { cn } from "../lib/utils";
 const NAV = [
     { to: "/dashboard",       icon: LayoutDashboard, label: "Dashboard",     exact: true },
     { to: "/dashboard/notes", icon: FileText,         label: "Meeting Notes"              },
-    { to: "/dashboard/tasks", icon: CheckSquare,      label: "Tasks"                      },
+    { to: "/dashboard/tasks",     icon: CheckSquare,  label: "Tasks"                      },
+    { to: "/dashboard/analytics", icon: BarChart2,    label: "Analytics"                  },
 ];
 
 function NavItem({ to, icon: Icon, label, exact, onClick }) {

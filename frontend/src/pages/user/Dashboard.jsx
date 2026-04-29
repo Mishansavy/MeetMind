@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, CheckSquare, ArrowRight, TrendingUp, Clock } from "lucide-react";
+import { FileText, CheckSquare, BarChart2, ArrowRight, TrendingUp, Clock } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authApi } from "../../api/auth";
 import AppShell from "../../components/AppShell";
@@ -108,7 +108,7 @@ export default function UserDashboard() {
                         value="—"
                         icon={TrendingUp}
                         color="bg-blue-50 text-blue-600"
-                        sub="Analytics coming soon"
+                        sub="View trends in analytics"
                     />
                 </div>
 
@@ -130,10 +130,11 @@ export default function UserDashboard() {
                             to="/dashboard/tasks"
                             color="bg-amber-50 text-amber-600"
                         />
-                        <ComingSoonCard
-                            icon={Clock}
-                            title="Live Meeting"
-                            description="Join or start a live WebRTC meeting room with real-time transcription."
+                        <QuickAction
+                            icon={BarChart2}
+                            title="Analytics"
+                            description="Notes per week, task completion trends, and workload at a glance."
+                            to="/dashboard/analytics"
                             color="bg-blue-50 text-blue-600"
                         />
                     </div>
