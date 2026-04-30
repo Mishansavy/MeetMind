@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, CheckSquare, BarChart2, ArrowRight, TrendingUp, Clock } from "lucide-react";
+import { FileText, CheckSquare, BarChart2, Video, ArrowRight, TrendingUp } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authApi } from "../../api/auth";
 import AppShell from "../../components/AppShell";
@@ -45,22 +45,6 @@ function QuickAction({ icon: Icon, title, description, to, color }) {
     );
 }
 
-function ComingSoonCard({ icon: Icon, title, description, color }) {
-    return (
-        <Card className="opacity-50 cursor-default">
-            <CardContent className="p-5 flex flex-col gap-3 h-full">
-                <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color}`}>
-                    <Icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1">
-                    <p className="text-sm font-semibold">{title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">Coming soon</p>
-            </CardContent>
-        </Card>
-    );
-}
 
 export default function UserDashboard() {
     const { user } = useAuth();
@@ -136,6 +120,13 @@ export default function UserDashboard() {
                             description="Notes per week, task completion trends, and workload at a glance."
                             to="/dashboard/analytics"
                             color="bg-blue-50 text-blue-600"
+                        />
+                        <QuickAction
+                            icon={Video}
+                            title="Live Meeting"
+                            description="Start or join a WebRTC meeting room. Share your screen and video."
+                            to="/dashboard/join"
+                            color="bg-emerald-50 text-emerald-600"
                         />
                     </div>
                 </div>

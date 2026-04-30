@@ -1,12 +1,13 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, LogOut, ShieldCheck, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, Video, LogOut, ShieldCheck, Menu } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 
 const NAV = [
-    { to: "/admin", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/admin/members", icon: Users, label: "Members" },
+    { to: "/admin",         icon: LayoutDashboard, label: "Dashboard"     },
+    { to: "/admin/members", icon: Users,            label: "Members"       },
+    { to: "/dashboard/join", icon: Video,           label: "Live Meetings" },
 ];
 
 function NavItem({ to, icon: Icon, label, onClick }) {
