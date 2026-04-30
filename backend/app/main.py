@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import auth, admin, meetings, tasks, analytics
+from app.routers import auth, admin, meetings, tasks, analytics, rooms
 from app.services.scheduler_service import start_scheduler, stop_scheduler
 
 
@@ -32,6 +32,7 @@ app.include_router(admin.router, prefix="/api/v1")
 app.include_router(meetings.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(rooms.router, prefix="/api/v1")
 
 
 @app.get("/health")
