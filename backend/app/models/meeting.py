@@ -10,6 +10,7 @@ from app.database import Base
 class NoteSource(str, enum.Enum):
     text = "text"
     pdf = "pdf"
+    transcript = "transcript"
 
 
 class MeetingNote(Base):

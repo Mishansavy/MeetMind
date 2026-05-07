@@ -1,17 +1,23 @@
 import json
 import logging
+import os
 import secrets
+import tempfile
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
+from app.models.meeting import MeetingNote, NoteSource
 from app.models.room import Room
+from app.models.task import Task
 from app.models.user import User
+from app.services.nlp_service import extract_tasks_ner, urgency_score
+from app.services.transcription_service import transcribe_audio
 from app.utils.security import decode_token
 
 logger = logging.getLogger(__name__)
@@ -26,8 +32,14 @@ class RoomResponse(BaseModel):
     room_code: str
     created_by: int
     is_active: bool
+    transcript: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class TranscribeResponse(BaseModel):
+    note_id: int
+    transcript: str
 
 
 async def _get_active_room(code: str, db: AsyncSession) -> Room:
@@ -73,6 +85,65 @@ async def close_room(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the host can close this room.")
     room.is_active = False
     await db.commit()
+
+
+@router.post("/{code}/transcribe", response_model=TranscribeResponse)
+async def transcribe_room(
+    code: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    room = await _get_active_room(code, db)
+
+    raw = await file.read()
+    suffix = os.path.splitext(file.filename or "audio.webm")[1] or ".webm"
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(raw)
+        tmp_path = tmp.name
+
+    try:
+        text = transcribe_audio(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    # Save transcript on room
+    room.transcript = text
+    await db.commit()
+
+    # Auto-create meeting note
+    note = MeetingNote(
+        user_id=current_user.id,
+        title=f"Room {code} — auto transcript",
+        content=text,
+        source=NoteSource.transcript,
+    )
+    db.add(note)
+    await db.flush()
+
+    # Extract tasks and bulk-save
+    previews = extract_tasks_ner(text)
+    result = await db.execute(
+        select(Task).where(Task.user_id == current_user.id, Task.is_complete.is_(False))
+    )
+    workload = len(result.scalars().all())
+
+    for p in previews:
+        score = urgency_score(None, workload)
+        task = Task(
+            user_id=current_user.id,
+            meeting_note_id=note.id,
+            title=p.title,
+            assignee_name=p.assignee_name,
+            priority=p.priority,
+            urgency_score=score,
+        )
+        db.add(task)
+
+    await db.commit()
+    await db.refresh(note)
+    return TranscribeResponse(note_id=note.id, transcript=text)
 
 
 @router.websocket("/{code}/ws")
