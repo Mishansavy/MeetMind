@@ -12,17 +12,16 @@ codebase/
 └── frontend/    React + Tailwind
 ```
 
-**Current features**
-- Registration with email verification
-- Admin approval flow before users can log in
+**Features**
+- Registration with email verification and admin approval flow
 - Separate dashboards for admin and regular users
+- Meeting notes — paste text or upload PDF
+- Task extraction from notes via spaCy NLP (NER + urgency scoring)
+- Task tracker with priority, assignee, deadline, and urgency badge
+- Automated email reminders 24h before task deadlines (APScheduler)
+- Analytics dashboard — meetings per week, task completion trends
+- Live meetings via WebRTC + PeerJS with in-process WebSocket signaling
 - Admin can approve, reject, and remove members
-
-**Planned**
-- Live meetings via WebRTC
-- Whisper-based transcription
-- AI meeting summaries and task extraction
-- Email reminders via APScheduler
 
 ---
 
@@ -109,13 +108,14 @@ App runs at `http://localhost:5173`.
 
 ## Creating an admin account
 
-There's no signup flow for admins — set one up directly in the database:
+Use the seed script — it creates the default admin and is safe to re-run (skips existing users):
 
-```sql
-UPDATE users
-SET role = 'admin', is_email_verified = true, is_approved = true
-WHERE email = 'your@email.com';
+```bash
+cd backend
+python seed.py
 ```
+
+To add more admins, edit the `ADMINS` list in `backend/seed.py` before running.
 
 ---
 
