@@ -119,6 +119,38 @@ To add more admins, edit the `ADMINS` list in `backend/seed.py` before running.
 
 ---
 
+## Running on your local network
+
+To access MeetMind from other devices (phone, tablet) on the same Wi-Fi:
+
+**1. Find your machine's local IP:**
+
+```bash
+ipconfig getifaddr en0
+```
+
+**2. Start the backend bound to all interfaces:**
+
+```bash
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**3. Start the frontend exposed on the network:**
+
+```bash
+cd frontend
+npm run dev -- --host
+```
+
+**4. Update the API base URL** in `frontend/src/api/axios.js` and the WebSocket URL in `frontend/src/pages/user/MeetingRoom.jsx` — replace `localhost` with your machine's IP (e.g. `192.168.x.x`).
+
+Then open `http://192.168.x.x:5173` on any device on the same network.
+
+> WebRTC (live meetings) also requires both devices to be on the same network or reachable via STUN. The Google STUN server (`stun.l.google.com:19302`) is already configured and handles most cases.
+
+---
+
 ## Notes
 
 - bcrypt is pinned to `4.0.1` — passlib breaks with v5
