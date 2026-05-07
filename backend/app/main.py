@@ -21,7 +21,7 @@ app = FastAPI(title="MeetMind API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(localhost|172\.20\.10\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?",
+    allow_origin_regex=r"https?://(localhost|172\.20\.10\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?|https://.*\.ngrok-free\.dev|https://.*\.ngrok\.io|https://.*\.loca\.lt",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
