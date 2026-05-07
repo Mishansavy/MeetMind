@@ -4,6 +4,7 @@ import { Video, ArrowRight, Hash } from "lucide-react";
 import { roomsApi } from "../../api/rooms";
 import { useAuth } from "../../context/AuthContext";
 import AppShell from "../../components/AppShell";
+import AdminShell from "../../components/AdminShell";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -37,8 +38,10 @@ export default function JoinMeeting() {
         navigate(`/dashboard/room?code=${trimmed}`);
     };
 
+    const Shell = isAdmin ? AdminShell : AppShell;
+
     return (
-        <AppShell>
+        <Shell>
             <div className="mb-8">
                 <div className="flex items-center gap-2 mb-0.5">
                     <Video className="h-5 w-5 text-muted-foreground" />
@@ -101,6 +104,6 @@ export default function JoinMeeting() {
                     </CardContent>
                 </Card>
             </div>
-        </AppShell>
+        </Shell>
     );
 }

@@ -60,7 +60,7 @@ export default function App() {
           <Route
             path="/dashboard/join"
             element={
-              <ProtectedRoute requiredRole="user">
+              <ProtectedRoute>
                 <JoinMeeting />
               </ProtectedRoute>
             }
@@ -68,7 +68,7 @@ export default function App() {
           <Route
             path="/dashboard/room"
             element={
-              <ProtectedRoute requiredRole="user">
+              <ProtectedRoute>
                 <MeetingRoom />
               </ProtectedRoute>
             }
