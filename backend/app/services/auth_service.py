@@ -1,3 +1,7 @@
+import random
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,9 +13,10 @@ from app.utils.security import (
     verify_password,
     create_access_token,
     create_email_verification_token,
+    create_password_reset_token,
     decode_token,
 )
-from app.services.email_service import send_verification_email
+from app.services.email_service import send_verification_email, send_otp_email, send_password_reset_email
 
 
 async def register_user(payload: RegisterRequest, db: AsyncSession) -> dict:
@@ -81,3 +86,66 @@ async def login_user(payload: LoginRequest, db: AsyncSession) -> dict:
 
     token = create_access_token(subject=str(user.id))
     return {"access_token": token, "token_type": "bearer"}
+
+
+async def request_otp(email: str, db: AsyncSession) -> dict:
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        # Don't reveal whether email exists
+        return {"message": "If that email is registered, a code has been sent."}
+    if not user.is_email_verified or not user.is_approved:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not active.")
+
+    otp = f"{random.randint(0, 999999):06d}"
+    user.otp_code = hash_password(otp)
+    user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    await db.commit()
+
+    send_otp_email(user.email, otp)
+    return {"message": "If that email is registered, a code has been sent."}
+
+
+async def verify_otp(email: str, otp: str, db: AsyncSession) -> dict:
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired code.")
+
+    if not user or not user.otp_code or not user.otp_expires_at:
+        raise invalid
+    if user.otp_expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise invalid
+    if not verify_password(otp, user.otp_code):
+        raise invalid
+
+    user.otp_code = None
+    user.otp_expires_at = None
+    await db.commit()
+
+    token = create_access_token(subject=str(user.id))
+    return {"access_token": token, "token_type": "bearer"}
+
+
+async def forgot_password(email: str, db: AsyncSession) -> dict:
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user and user.is_active and user.is_email_verified:
+        token = create_password_reset_token(user.email)
+        send_password_reset_email(user.email, token)
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+async def reset_password(token: str, new_password: str, db: AsyncSession) -> dict:
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "password_reset":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link.")
+
+    result = await db.execute(select(User).where(User.email == payload["sub"]))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    user.hashed_password = hash_password(new_password)
+    await db.commit()
+    return {"message": "Password updated. You can now log in."}

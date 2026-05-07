@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.user import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from app.schemas.user import (
+    RegisterRequest, LoginRequest, TokenResponse, UserResponse,
+    OtpRequest, OtpVerify, ForgotPasswordRequest, ResetPasswordRequest,
+)
 from app.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -49,3 +52,23 @@ async def me_stats(
         "meetings": notes_count or 0,
         "tasks_pending": tasks_pending or 0,
     }
+
+
+@router.post("/otp/request")
+async def otp_request(payload: OtpRequest, db: AsyncSession = Depends(get_db)):
+    return await auth_service.request_otp(payload.email, db)
+
+
+@router.post("/otp/verify", response_model=TokenResponse)
+async def otp_verify(payload: OtpVerify, db: AsyncSession = Depends(get_db)):
+    return await auth_service.verify_otp(payload.email, payload.otp, db)
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    return await auth_service.forgot_password(payload.email, db)
+
+
+@router.post("/reset-password")
+async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    return await auth_service.reset_password(payload.token, payload.new_password, db)

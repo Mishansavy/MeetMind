@@ -31,6 +31,38 @@ def send_verification_email(to_email: str, token: str) -> None:
     _send(msg)
 
 
+def send_otp_email(to_email: str, otp: str) -> None:
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Your MeetMind login code"
+    msg["From"] = settings.SMTP_USER
+    msg["To"] = to_email
+
+    html = f"""
+    <p>Your one-time login code for MeetMind is:</p>
+    <h2 style="letter-spacing:8px;font-size:32px;font-weight:bold;color:#1e293b;">{otp}</h2>
+    <p>This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p>
+    """
+    msg.attach(MIMEText(html, "html"))
+    _send(msg)
+
+
+def send_password_reset_email(to_email: str, token: str) -> None:
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Reset your MeetMind password"
+    msg["From"] = settings.SMTP_USER
+    msg["To"] = to_email
+
+    html = f"""
+    <p>Click the link below to reset your MeetMind password:</p>
+    <a href="{reset_url}" style="display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none;">Reset password</a>
+    <p style="margin-top:16px;color:#64748b;font-size:13px;">This link expires in 30 minutes. If you didn't request this, ignore this email.</p>
+    """
+    msg.attach(MIMEText(html, "html"))
+    _send(msg)
+
+
 def send_reminder_email(to_email: str, name: str, task_title: str, deadline: date) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Task due tomorrow: {task_title}"
