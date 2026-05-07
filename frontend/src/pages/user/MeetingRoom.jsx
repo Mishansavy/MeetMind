@@ -7,7 +7,7 @@ import { roomsApi } from "../../api/rooms";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 
-const WS_BASE = "ws://localhost:8000/api/v1";
+const WS_BASE = import.meta.env.VITE_WS_URL || "ws://localhost:8000/api/v1";
 
 function VideoTile({ stream, label, muted = false }) {
     const ref = useRef(null);
