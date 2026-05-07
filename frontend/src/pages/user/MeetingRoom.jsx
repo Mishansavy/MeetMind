@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Check } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Check, Captions, CaptionsOff, FileText, Loader2 } from "lucide-react";
 import Peer from "peerjs";
 import { useAuth } from "../../context/AuthContext";
 import { roomsApi } from "../../api/rooms";
@@ -37,11 +37,23 @@ export default function MeetingRoom() {
     const { user } = useAuth();
 
     const [localStream, setLocalStream] = useState(null);
-    const [peers, setPeers] = useState({}); // peerId -> { stream, name }
+    const [peers, setPeers] = useState({});
     const [audioOn, setAudioOn] = useState(true);
     const [videoOn, setVideoOn] = useState(true);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState("");
+
+    // Captions (Phase 7a)
+    const [captionsOn, setCaptionsOn] = useState(false);
+    const [captions, setCaptions] = useState([]); // [{id, speaker, text}]
+    const recognitionRef = useRef(null);
+    const captionTimerRef = useRef({});
+
+    // Recording + transcription (Phase 7b)
+    const [recording, setRecording] = useState(false);
+    const [transcribing, setTranscribing] = useState(false);
+    const recorderRef = useRef(null);
+    const chunksRef = useRef([]);
 
     const peerRef = useRef(null);
     const wsRef = useRef(null);
@@ -60,13 +72,63 @@ export default function MeetingRoom() {
         });
     }, []);
 
+    // ── Caption helpers ───────────────────────────────────────────────────────
+    const addCaption = useCallback((id, speaker, text) => {
+        setCaptions((prev) => {
+            const filtered = prev.filter((c) => c.id !== id);
+            return [...filtered.slice(-4), { id, speaker, text }];
+        });
+        if (captionTimerRef.current[id]) clearTimeout(captionTimerRef.current[id]);
+        captionTimerRef.current[id] = setTimeout(() => {
+            setCaptions((prev) => prev.filter((c) => c.id !== id));
+            delete captionTimerRef.current[id];
+        }, 5000);
+    }, []);
+
+    const startCaptions = useCallback(() => {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) return;
+        const rec = new SR();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = "en-US";
+        const myId = "local-caption";
+        rec.onresult = (e) => {
+            const transcript = Array.from(e.results)
+                .map((r) => r[0].transcript)
+                .join("");
+            addCaption(myId, user?.name || "You", transcript);
+            if (e.results[e.results.length - 1].isFinal && wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                    event: "caption",
+                    text: transcript,
+                    speaker: user?.name || "You",
+                }));
+            }
+        };
+        rec.onerror = () => {};
+        rec.start();
+        recognitionRef.current = rec;
+        setCaptionsOn(true);
+    }, [user, addCaption]);
+
+    const stopCaptions = useCallback(() => {
+        recognitionRef.current?.stop();
+        recognitionRef.current = null;
+        setCaptionsOn(false);
+    }, []);
+
+    const toggleCaptions = useCallback(() => {
+        captionsOn ? stopCaptions() : startCaptions();
+    }, [captionsOn, startCaptions, stopCaptions]);
+
+    // ── WebRTC setup ──────────────────────────────────────────────────────────
     useEffect(() => {
         if (!code || !user) return;
         let cancelled = false;
 
         const token = localStorage.getItem("token");
 
-        // Verify room exists before setting up media
         roomsApi.getRoom(code).catch(() => {
             setError("Room not found or no longer active.");
         });
@@ -78,18 +140,14 @@ export default function MeetingRoom() {
                 localStreamRef.current = stream;
                 setLocalStream(stream);
 
-                // PeerJS — use public STUN only, no paid PeerJS cloud
                 const peer = new Peer({
-                    config: {
-                        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-                    },
+                    config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
                 });
                 peerRef.current = peer;
 
                 peer.on("open", (myPeerId) => {
                     if (cancelled) return;
 
-                    // Connect to signaling WS
                     const ws = new WebSocket(`${WS_BASE}/rooms/${code}/ws?token=${token}`);
                     wsRef.current = ws;
 
@@ -97,7 +155,6 @@ export default function MeetingRoom() {
                         const msg = JSON.parse(e.data);
 
                         if (msg.event === "peer-joined") {
-                            // Initiate call to the new peer
                             ws.send(JSON.stringify({ event: "peer-id", peerId: myPeerId, name: user.name }));
                         }
 
@@ -113,6 +170,11 @@ export default function MeetingRoom() {
                             delete callsRef.current[msg.peerId];
                             removePeer(msg.peerId);
                         }
+
+                        // Remote captions
+                        if (msg.event === "caption" && msg.speaker && msg.text) {
+                            addCaption(`remote-${msg.speaker}`, msg.speaker, msg.text);
+                        }
                     };
 
                     ws.onclose = () => {
@@ -120,7 +182,6 @@ export default function MeetingRoom() {
                     };
                 });
 
-                // Answer incoming calls
                 peer.on("call", (call) => {
                     call.answer(stream);
                     callsRef.current[call.peer] = call;
@@ -138,12 +199,15 @@ export default function MeetingRoom() {
 
         return () => {
             cancelled = true;
+            recognitionRef.current?.stop();
+            recorderRef.current?.state === "recording" && recorderRef.current.stop();
             wsRef.current?.close();
             peerRef.current?.destroy();
             localStreamRef.current?.getTracks().forEach((t) => t.stop());
         };
-    }, [code, user, addPeer, removePeer]);
+    }, [code, user, addPeer, removePeer, addCaption]);
 
+    // ── Controls ──────────────────────────────────────────────────────────────
     const toggleAudio = () => {
         localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = !t.enabled; });
         setAudioOn((v) => !v);
@@ -155,6 +219,7 @@ export default function MeetingRoom() {
     };
 
     const handleLeave = () => {
+        recognitionRef.current?.stop();
         wsRef.current?.close();
         peerRef.current?.destroy();
         localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -165,6 +230,37 @@ export default function MeetingRoom() {
         navigator.clipboard.writeText(code);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // ── Recording / transcription ─────────────────────────────────────────────
+    const startRecording = () => {
+        if (!localStreamRef.current) return;
+        chunksRef.current = [];
+        const recorder = new MediaRecorder(localStreamRef.current, { mimeType: "audio/webm" });
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        recorder.start(1000);
+        recorderRef.current = recorder;
+        setRecording(true);
+    };
+
+    const stopAndTranscribe = () => {
+        const recorder = recorderRef.current;
+        if (!recorder || recorder.state !== "recording") return;
+        recorder.onstop = async () => {
+            setRecording(false);
+            setTranscribing(true);
+            try {
+                const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+                const form = new FormData();
+                form.append("file", blob, "recording.webm");
+                const { data } = await roomsApi.transcribe(code, form);
+                navigate(`/dashboard/notes?highlight=${data.note_id}`);
+            } catch {
+                setError("Transcription failed. Try again.");
+                setTranscribing(false);
+            }
+        };
+        recorder.stop();
     };
 
     const allStreams = [
@@ -187,7 +283,7 @@ export default function MeetingRoom() {
             </div>
 
             {/* Video grid */}
-            <div className="flex-1 p-4 overflow-auto">
+            <div className="flex-1 p-4 overflow-auto relative">
                 {error ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="text-center">
@@ -198,16 +294,40 @@ export default function MeetingRoom() {
                         </div>
                     </div>
                 ) : (
-                    <div className={cn(
-                        "grid gap-3 h-full",
-                        allStreams.length === 1 && "grid-cols-1 max-w-2xl mx-auto",
-                        allStreams.length === 2 && "grid-cols-2",
-                        allStreams.length >= 3 && "grid-cols-2 sm:grid-cols-3",
-                    )}>
-                        {allStreams.map(({ id, stream, label, muted }) => (
-                            <VideoTile key={id} stream={stream} label={label} muted={muted} />
-                        ))}
-                    </div>
+                    <>
+                        <div className={cn(
+                            "grid gap-3 h-full",
+                            allStreams.length === 1 && "grid-cols-1 max-w-2xl mx-auto",
+                            allStreams.length === 2 && "grid-cols-2",
+                            allStreams.length >= 3 && "grid-cols-2 sm:grid-cols-3",
+                        )}>
+                            {allStreams.map(({ id, stream, label, muted }) => (
+                                <VideoTile key={id} stream={stream} label={label} muted={muted} />
+                            ))}
+                        </div>
+
+                        {/* Live captions overlay */}
+                        {captions.length > 0 && (
+                            <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-1 items-center pointer-events-none">
+                                {captions.map(({ id, speaker, text }) => (
+                                    <div key={id} className="bg-black/70 text-white text-sm px-3 py-1.5 rounded-lg max-w-xl text-center">
+                                        <span className="text-slate-400 text-xs mr-1">{speaker}:</span>
+                                        {text}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Transcribing overlay */}
+                        {transcribing && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                                <div className="flex items-center gap-2 text-white text-sm">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                    Transcribing audio…
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -230,6 +350,28 @@ export default function MeetingRoom() {
                     )}
                 >
                     {videoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                </button>
+                <button
+                    onClick={toggleCaptions}
+                    title={captionsOn ? "Hide captions" : "Show captions"}
+                    className={cn(
+                        "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
+                        captionsOn ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-slate-700 hover:bg-slate-600 text-white"
+                    )}
+                >
+                    {captionsOn ? <Captions className="h-5 w-5" /> : <CaptionsOff className="h-5 w-5" />}
+                </button>
+                <button
+                    onClick={recording ? stopAndTranscribe : startRecording}
+                    disabled={transcribing}
+                    title={recording ? "Stop & transcribe" : "Start recording"}
+                    className={cn(
+                        "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
+                        recording ? "bg-amber-500 hover:bg-amber-400 text-white animate-pulse" : "bg-slate-700 hover:bg-slate-600 text-white",
+                        transcribing && "opacity-50 cursor-not-allowed"
+                    )}
+                >
+                    <FileText className="h-5 w-5" />
                 </button>
                 <button
                     onClick={handleLeave}

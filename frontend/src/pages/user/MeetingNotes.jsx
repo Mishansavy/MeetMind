@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FileText, Plus, Trash2, Upload, AlignLeft, FileUp, Zap, Check } from "lucide-react";
 import { meetingsApi } from "../../api/meetings";
 import { tasksApi } from "../../api/tasks";
@@ -334,11 +335,23 @@ export default function MeetingNotes() {
     const [selected, setSelected] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [extractNote, setExtractNote] = useState(null);
+    const [searchParams] = useSearchParams();
+    const highlightId = searchParams.get("highlight");
 
     const fetchNotes = () =>
-        meetingsApi.list().then((r) => setNotes(r.data)).catch(() => {});
+        meetingsApi.list().then((r) => {
+            setNotes(r.data);
+            return r.data;
+        }).catch(() => []);
 
-    useEffect(() => { fetchNotes(); }, []);
+    useEffect(() => {
+        fetchNotes().then((data) => {
+            if (highlightId) {
+                const found = data.find((n) => String(n.id) === highlightId);
+                if (found) setSelected(found);
+            }
+        });
+    }, [highlightId]);
 
     const handleDelete = async (id) => {
         await meetingsApi.remove(id).catch(() => {});
