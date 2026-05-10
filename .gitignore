@@ -108,3 +108,12 @@ Desktop.ini
 *.orig
 .temp/
 tmp/
+
+# ========================
+# Project report (local only)
+# ========================
+MeetMind_Technical_Document.md
+generate_diagrams.py
+docs/
+cert.pem
+key.pem
