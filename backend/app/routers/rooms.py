@@ -23,7 +23,9 @@ from app.utils.security import decode_token
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
-# In-process signaling hub: room_code -> set of connected sockets
+# In-process signaling hub: room_code → set of connected WebSocket connections.
+# Scoped to this process — not shared across workers, which is fine for a single-server
+# deployment. Multi-server would need a Redis pub/sub backend instead.
 _hub: dict[str, set[WebSocket]] = {}
 
 
@@ -94,6 +96,12 @@ async def transcribe_room(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Accept a WebM/WAV audio blob, run Whisper, and auto-create a note + tasks.
+
+    The audio is written to a temp file because Whisper's Python API expects a
+    file path, not a bytes buffer. The temp file is deleted in the finally block
+    regardless of whether transcription succeeds.
+    """
     room = await _get_active_room(code, db)
 
     raw = await file.read()
@@ -108,11 +116,9 @@ async def transcribe_room(
     finally:
         os.unlink(tmp_path)
 
-    # Save transcript on room
     room.transcript = text
     await db.commit()
 
-    # Auto-create meeting note
     note = MeetingNote(
         user_id=current_user.id,
         title=f"Room {code} — auto transcript",
@@ -120,9 +126,8 @@ async def transcribe_room(
         source=NoteSource.transcript,
     )
     db.add(note)
-    await db.flush()
+    await db.flush()  # get note.id before creating tasks that reference it
 
-    # Extract tasks and bulk-save
     previews = extract_tasks_ner(text)
     result = await db.execute(
         select(Task).where(Task.user_id == current_user.id, Task.is_complete.is_(False))
@@ -153,7 +158,16 @@ async def room_ws(
     token: Optional[str] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    # Auth via query param — HTTPBearer doesn't work over WS
+    """WebSocket signaling channel for WebRTC peer negotiation.
+
+    Auth is via a ?token= query param instead of an Authorization header because
+    the browser WebSocket API does not support custom headers — only query params
+    and cookies are available at connection time.
+
+    The hub forwards all messages to every other peer in the room. Peers use these
+    forwarded messages to exchange PeerJS peer IDs, then negotiate WebRTC directly
+    without further server involvement.
+    """
     payload = decode_token(token) if token else None
     if not payload:
         await websocket.close(code=4001)
@@ -165,7 +179,6 @@ async def room_ws(
         await websocket.close(code=4001)
         return
 
-    # Verify room exists and is active
     result = await db.execute(
         select(Room).where(Room.room_code == code, Room.is_active.is_(True))
     )
@@ -178,7 +191,6 @@ async def room_ws(
     peers = _hub.setdefault(code, set())
     peers.add(websocket)
 
-    # Notify others that a peer joined
     await _broadcast(code, {"event": "peer-joined", "peerId": user.id, "name": user.name}, exclude=websocket)
 
     try:
@@ -188,7 +200,6 @@ async def room_ws(
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-            # Forward all signaling messages to every other peer in the room
             await _broadcast(code, msg, exclude=websocket)
     except WebSocketDisconnect:
         pass
@@ -208,5 +219,6 @@ async def _broadcast(code: str, payload: dict, exclude: Optional[WebSocket] = No
         try:
             await ws.send_text(json.dumps(payload))
         except Exception:
+            # Socket died mid-send — collect and remove after iteration.
             dead.add(ws)
     peers -= dead

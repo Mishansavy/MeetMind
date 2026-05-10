@@ -46,5 +46,3 @@ class ExtractedTaskPreview(BaseModel):
     urgency_score: Optional[float] = None
 
 
-class BulkSaveRequest(BaseModel):
-    tasks: list[ExtractedTaskPreview]

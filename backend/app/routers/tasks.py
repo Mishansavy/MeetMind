@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse, BulkSaveRequest, ExtractedTaskPreview
+from app.schemas.task import TaskCreate, TaskUpdate, TaskResponse, ExtractedTaskPreview
 from app.services import task_service, meeting_service, nlp_service
 
 router = APIRouter(tags=["Tasks"])
@@ -59,9 +59,9 @@ async def extract_tasks(
 @router.post("/meetings/{note_id}/tasks", response_model=list[TaskResponse], status_code=201)
 async def bulk_save_tasks(
     note_id: int,
-    payload: BulkSaveRequest,
+    payload: list[ExtractedTaskPreview],
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     await meeting_service.get_note(note_id, current_user.id, db)
-    return await task_service.bulk_save_tasks(current_user.id, note_id, payload.tasks, db)
+    return await task_service.bulk_save_tasks(current_user.id, note_id, payload, db)
