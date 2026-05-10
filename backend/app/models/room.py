@@ -15,4 +15,10 @@ class Room(Base):
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Set when the first peer connects; used to compute meeting duration.
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when the admin closes the room or the last peer disconnects.
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Peak simultaneous participant count tracked by the WebSocket hub.
+    participant_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

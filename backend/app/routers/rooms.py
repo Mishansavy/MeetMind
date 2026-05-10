@@ -3,6 +3,7 @@ import logging
 import os
 import secrets
 import tempfile
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect, status
@@ -35,6 +36,9 @@ class RoomResponse(BaseModel):
     created_by: int
     is_active: bool
     transcript: Optional[str] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    participant_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -86,6 +90,7 @@ async def close_room(
     if room.created_by != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the host can close this room.")
     room.is_active = False
+    room.ended_at = datetime.now(timezone.utc)
     await db.commit()
 
 
@@ -117,30 +122,37 @@ async def transcribe_room(
         os.unlink(tmp_path)
 
     room.transcript = text
+    now = datetime.now(timezone.utc)
+    # Record when the meeting effectively ended (transcription triggered at close).
+    if not room.ended_at:
+        room.ended_at = now
     await db.commit()
 
+    meeting_label = room.started_at.strftime("%b %d, %Y %H:%M") if room.started_at else now.strftime("%b %d, %Y %H:%M")
     note = MeetingNote(
         user_id=current_user.id,
-        title=f"Room {code} — auto transcript",
+        title=f"Meeting {code} -- {meeting_label}",
         content=text,
         source=NoteSource.transcript,
     )
     db.add(note)
-    await db.flush()  # get note.id before creating tasks that reference it
+    await db.flush()
 
     previews = extract_tasks_ner(text)
-    result = await db.execute(
+    workload_result = await db.execute(
         select(Task).where(Task.user_id == current_user.id, Task.is_complete.is_(False))
     )
-    workload = len(result.scalars().all())
+    workload = len(workload_result.scalars().all())
 
-    for p in previews:
-        score = urgency_score(None, workload)
+    for i, p in enumerate(previews):
+        # Use the NER-extracted deadline if available; urgency_score handles None.
+        score = urgency_score(p.deadline, workload + i)
         task = Task(
             user_id=current_user.id,
             meeting_note_id=note.id,
             title=p.title,
             assignee_name=p.assignee_name,
+            deadline=p.deadline,
             priority=p.priority,
             urgency_score=score,
         )
@@ -190,6 +202,19 @@ async def room_ws(
 
     peers = _hub.setdefault(code, set())
     peers.add(websocket)
+
+    # Record the meeting start time when the first peer connects.
+    # Re-fetch room inside the WS handler because the db session from the route
+    # dependency is a fresh session, not shared with the REST routes.
+    ws_room_result = await db.execute(select(Room).where(Room.room_code == code))
+    ws_room = ws_room_result.scalar_one_or_none()
+    if ws_room:
+        if ws_room.started_at is None:
+            ws_room.started_at = datetime.now(timezone.utc)
+        # Track the peak number of simultaneous participants.
+        if len(peers) > ws_room.participant_count:
+            ws_room.participant_count = len(peers)
+        await db.commit()
 
     await _broadcast(code, {"event": "peer-joined", "peerId": user.id, "name": user.name}, exclude=websocket)
 
