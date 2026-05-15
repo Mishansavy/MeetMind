@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Check, Captions, CaptionsOff, FileText, Loader2 } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Check, Captions, CaptionsOff, Loader2, Circle, Square } from "lucide-react";
 import Peer from "peerjs";
 import { useAuth } from "../../context/AuthContext";
 import { roomsApi } from "../../api/rooms";
@@ -30,6 +30,27 @@ function VideoTile({ stream, label, muted = false }) {
     );
 }
 
+// Status pill shown in top bar during recording / transcribing
+function StatusPill({ recording, transcribing }) {
+    if (transcribing) {
+        return (
+            <div className="flex items-center gap-1.5 bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 text-xs px-3 py-1 rounded-full">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Transcribing — please wait…
+            </div>
+        );
+    }
+    if (recording) {
+        return (
+            <div className="flex items-center gap-1.5 bg-red-600/20 border border-red-500/40 text-red-400 text-xs px-3 py-1 rounded-full animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-red-500 inline-block" />
+                Recording — click Stop to transcribe
+            </div>
+        );
+    }
+    return null;
+}
+
 export default function MeetingRoom() {
     const [params] = useSearchParams();
     const code = params.get("code") || "";
@@ -43,13 +64,13 @@ export default function MeetingRoom() {
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState("");
 
-    // Captions (Phase 7a)
+    // Captions
     const [captionsOn, setCaptionsOn] = useState(false);
-    const [captions, setCaptions] = useState([]); // [{id, speaker, text}]
+    const [captions, setCaptions] = useState([]);
     const recognitionRef = useRef(null);
     const captionTimerRef = useRef({});
 
-    // Recording + transcription (Phase 7b)
+    // Recording + transcription
     const [recording, setRecording] = useState(false);
     const [transcribing, setTranscribing] = useState(false);
     const recorderRef = useRef(null);
@@ -94,16 +115,10 @@ export default function MeetingRoom() {
         rec.lang = "en-US";
         const myId = "local-caption";
         rec.onresult = (e) => {
-            const transcript = Array.from(e.results)
-                .map((r) => r[0].transcript)
-                .join("");
+            const transcript = Array.from(e.results).map((r) => r[0].transcript).join("");
             addCaption(myId, user?.name || "You", transcript);
             if (e.results[e.results.length - 1].isFinal && wsRef.current?.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify({
-                    event: "caption",
-                    text: transcript,
-                    speaker: user?.name || "You",
-                }));
+                wsRef.current.send(JSON.stringify({ event: "caption", text: transcript, speaker: user?.name || "You" }));
             }
         };
         rec.onerror = () => {};
@@ -157,21 +172,17 @@ export default function MeetingRoom() {
                         if (msg.event === "peer-joined") {
                             ws.send(JSON.stringify({ event: "peer-id", peerId: myPeerId, name: user.name }));
                         }
-
                         if (msg.event === "peer-id" && msg.peerId !== myPeerId) {
                             const call = peer.call(msg.peerId, stream, { metadata: { name: user.name } });
                             callsRef.current[msg.peerId] = call;
                             call.on("stream", (remoteStream) => addPeer(msg.peerId, remoteStream, msg.name));
                             call.on("close", () => removePeer(msg.peerId));
                         }
-
                         if (msg.event === "peer-left") {
                             callsRef.current[msg.peerId]?.close();
                             delete callsRef.current[msg.peerId];
                             removePeer(msg.peerId);
                         }
-
-                        // Remote captions
                         if (msg.event === "caption" && msg.speaker && msg.text) {
                             addCaption(`remote-${msg.speaker}`, msg.speaker, msg.text);
                         }
@@ -185,9 +196,7 @@ export default function MeetingRoom() {
                 peer.on("call", (call) => {
                     call.answer(stream);
                     callsRef.current[call.peer] = call;
-                    call.on("stream", (remoteStream) =>
-                        addPeer(call.peer, remoteStream, call.metadata?.name || "Guest")
-                    );
+                    call.on("stream", (remoteStream) => addPeer(call.peer, remoteStream, call.metadata?.name || "Guest"));
                     call.on("close", () => removePeer(call.peer));
                 });
 
@@ -234,25 +243,35 @@ export default function MeetingRoom() {
 
     // ── Recording / transcription ─────────────────────────────────────────────
     const startRecording = () => {
-        if (!localStreamRef.current) return;
+        if (!localStreamRef.current) {
+            setError("No audio stream available to record.");
+            return;
+        }
         chunksRef.current = [];
 
-        // Pick the first mimeType the browser actually supports.
-        // audio/webm is not supported on Safari; mp4 works on Safari and Chrome.
-        const mimeType = [
-            "audio/webm;codecs=opus",
-            "audio/webm",
-            "audio/mp4",
-            "audio/ogg;codecs=opus",
-            "",
-        ].find((m) => m === "" || MediaRecorder.isTypeSupported(m));
+        const audioTracks = localStreamRef.current.getAudioTracks();
+        if (audioTracks.length === 0) {
+            setError("No microphone track found. Allow microphone access and rejoin.");
+            return;
+        }
 
-        const recorder = new MediaRecorder(
-            localStreamRef.current,
-            mimeType ? { mimeType } : {},
-        );
+        // Record audio-only to avoid codec issues with mixed video+audio streams.
+        const audioStream = new MediaStream(audioTracks);
+
+        const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]
+            .find((m) => MediaRecorder.isTypeSupported(m));
+
+        let recorder;
+        try {
+            recorder = supportedMime
+                ? new MediaRecorder(audioStream, { mimeType: supportedMime })
+                : new MediaRecorder(audioStream);
+            recorder.start(1000);
+        } catch (err) {
+            setError(`Recording failed to start: ${err.message}`);
+            return;
+        }
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-        recorder.start(1000);
         recorderRef.current = recorder;
         setRecording(true);
     };
@@ -298,11 +317,14 @@ export default function MeetingRoom() {
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
                 <span className="text-sm font-semibold text-white">MeetMind</span>
+
+                <StatusPill recording={recording} transcribing={transcribing} />
+
                 <button
                     onClick={copyCode}
                     className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
                 >
-                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                     <span className="font-mono">{code}</span>
                 </button>
             </div>
@@ -343,12 +365,13 @@ export default function MeetingRoom() {
                             </div>
                         )}
 
-                        {/* Transcribing overlay */}
+                        {/* Transcribing full-screen overlay */}
                         {transcribing && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                                <div className="flex items-center gap-2 text-white text-sm">
-                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                    Transcribing audio…
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-xl">
+                                <div className="flex flex-col items-center gap-3 text-white">
+                                    <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+                                    <p className="text-sm font-medium">Transcribing your meeting…</p>
+                                    <p className="text-xs text-slate-400">Extracting tasks and saving notes</p>
                                 </div>
                             </div>
                         )}
@@ -357,54 +380,85 @@ export default function MeetingRoom() {
             </div>
 
             {/* Controls */}
-            <div className="flex items-center justify-center gap-3 py-4 border-t border-slate-800">
-                <button
-                    onClick={toggleAudio}
-                    className={cn(
-                        "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
-                        audioOn ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-red-600 hover:bg-red-500 text-white"
-                    )}
-                >
-                    {audioOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-                </button>
-                <button
-                    onClick={toggleVideo}
-                    className={cn(
-                        "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
-                        videoOn ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-red-600 hover:bg-red-500 text-white"
-                    )}
-                >
-                    {videoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                </button>
-                <button
-                    onClick={toggleCaptions}
-                    title={captionsOn ? "Hide captions" : "Show captions"}
-                    className={cn(
-                        "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
-                        captionsOn ? "bg-indigo-600 hover:bg-indigo-500 text-white" : "bg-slate-700 hover:bg-slate-600 text-white"
-                    )}
-                >
-                    {captionsOn ? <Captions className="h-5 w-5" /> : <CaptionsOff className="h-5 w-5" />}
-                </button>
-                <button
-                    onClick={recording ? stopAndTranscribe : startRecording}
-                    disabled={transcribing}
-                    title={recording ? "Stop & transcribe" : "Start recording"}
-                    className={cn(
-                        "h-11 w-11 rounded-full flex items-center justify-center transition-colors",
-                        recording ? "bg-amber-500 hover:bg-amber-400 text-white animate-pulse" : "bg-slate-700 hover:bg-slate-600 text-white",
-                        transcribing && "opacity-50 cursor-not-allowed"
-                    )}
-                >
-                    <FileText className="h-5 w-5" />
-                </button>
-                <button
-                    onClick={handleLeave}
-                    className="h-11 w-11 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center text-white transition-colors"
-                >
-                    <PhoneOff className="h-5 w-5" />
-                </button>
+            <div className="flex flex-col items-center gap-3 py-4 border-t border-slate-800">
+                <div className="flex items-center gap-3">
+                    {/* Mic */}
+                    <ControlButton
+                        onClick={toggleAudio}
+                        active={audioOn}
+                        label={audioOn ? "Mute" : "Unmute"}
+                    >
+                        {audioOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                    </ControlButton>
+
+                    {/* Camera */}
+                    <ControlButton
+                        onClick={toggleVideo}
+                        active={videoOn}
+                        label={videoOn ? "Stop video" : "Start video"}
+                    >
+                        {videoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                    </ControlButton>
+
+                    {/* Captions */}
+                    <ControlButton
+                        onClick={toggleCaptions}
+                        active={captionsOn}
+                        activeColor="bg-indigo-600 hover:bg-indigo-500"
+                        label={captionsOn ? "Hide captions" : "Show captions"}
+                    >
+                        {captionsOn ? <Captions className="h-5 w-5" /> : <CaptionsOff className="h-5 w-5" />}
+                    </ControlButton>
+
+                    {/* Record / Stop */}
+                    <ControlButton
+                        onClick={recording ? stopAndTranscribe : startRecording}
+                        disabled={transcribing}
+                        active={recording}
+                        activeColor="bg-red-600 hover:bg-red-500 animate-pulse"
+                        label={recording ? "Stop & transcribe" : "Start recording"}
+                    >
+                        {recording
+                            ? <Square className="h-4 w-4 fill-current" />
+                            : <Circle className="h-5 w-5" />
+                        }
+                    </ControlButton>
+
+                    {/* Leave */}
+                    <button
+                        onClick={handleLeave}
+                        title="Leave meeting"
+                        className="h-11 w-11 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center text-white transition-colors"
+                    >
+                        <PhoneOff className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {/* Hint text under controls */}
+                <p className="text-xs text-slate-500 h-4">
+                    {recording && "Speaking? Your audio is being recorded."}
+                    {!recording && !transcribing && "Click the record button to capture the meeting."}
+                </p>
             </div>
         </div>
+    );
+}
+
+function ControlButton({ onClick, active, activeColor, label, disabled, children }) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            title={label}
+            className={cn(
+                "h-11 w-11 rounded-full flex items-center justify-center transition-colors text-white",
+                active
+                    ? (activeColor || "bg-slate-500 hover:bg-slate-400")
+                    : "bg-slate-700 hover:bg-slate-600",
+                disabled && "opacity-40 cursor-not-allowed",
+            )}
+        >
+            {children}
+        </button>
     );
 }

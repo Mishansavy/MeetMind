@@ -120,24 +120,36 @@ async def transcribe_room(
     The audio is written to a temp file because Whisper's Python API expects a
     file path, not a bytes buffer. The temp file is deleted in the finally block
     regardless of whether transcription succeeds.
+
+    Accepts inactive rooms -- transcription is often triggered right as the last
+    peer disconnects, so requiring is_active=True would cause spurious 404s.
     """
-    room = await _get_active_room(code, db)
+    result = await db.execute(select(Room).where(Room.room_code == code))
+    room = result.scalar_one_or_none()
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found.")
 
     raw = await file.read()
     suffix = os.path.splitext(file.filename or "audio.webm")[1] or ".webm"
+    logger.info("transcribe: received file=%s size=%d suffix=%s user=%s room=%s",
+                file.filename, len(raw), suffix, current_user.email, code)
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
 
     try:
+        logger.info("transcribe: running whisper on %s", tmp_path)
         text = transcribe_audio(tmp_path)
+        logger.info("transcribe: whisper result: %r", text[:200])
+    except Exception as exc:
+        logger.error("transcribe: whisper failed: %s", exc, exc_info=True)
+        raise
     finally:
         os.unlink(tmp_path)
 
     room.transcript = text
     now = datetime.now(timezone.utc)
-    # Record when the meeting effectively ended (transcription triggered at close).
     if not room.ended_at:
         room.ended_at = now
     await db.commit()
@@ -153,16 +165,20 @@ async def transcribe_room(
     await db.flush()
 
     previews = extract_tasks_ner(text)
+    logger.info("transcribe: NLP extracted %d tasks from transcript", len(previews))
+    for p in previews:
+        logger.info("  task: %r  assignee=%s  deadline_raw=%s  priority=%s",
+                    p.title, p.assignee_name, p.deadline_raw, p.priority)
+
     workload_result = await db.execute(
         select(Task).where(Task.user_id == current_user.id, Task.is_complete.is_(False))
     )
     workload = len(workload_result.scalars().all())
 
     for i, p in enumerate(previews):
-        # deadline_raw is a free-form string from spaCy ("by Friday", "next Monday").
-        # Parse it to a real date here for urgency scoring and task storage.
         deadline = _parse_deadline(p.deadline_raw)
         score = urgency_score(deadline, workload + i)
+        logger.info("  saving task %d: deadline=%s score=%s", i, deadline, score)
         task = Task(
             user_id=current_user.id,
             meeting_note_id=note.id,
@@ -176,6 +192,7 @@ async def transcribe_room(
 
     await db.commit()
     await db.refresh(note)
+    logger.info("transcribe: done note_id=%d task_count=%d", note.id, len(previews))
     return TranscribeResponse(note_id=note.id, transcript=text, task_count=len(previews))
 
 

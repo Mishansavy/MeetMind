@@ -1,3 +1,6 @@
+import logging
+import logging.handlers
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,6 +9,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from app.routers import auth, admin, meetings, tasks, analytics, rooms
 from app.services.scheduler_service import start_scheduler, stop_scheduler
+
+_log_path = os.path.join(os.path.dirname(__file__), "..", "..", "meetmind.log")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.handlers.RotatingFileHandler(
+            os.path.abspath(_log_path), maxBytes=5_000_000, backupCount=2
+        ),
+        logging.StreamHandler(),
+    ],
+)
 
 
 @asynccontextmanager
