@@ -14,6 +14,8 @@ class Room(Base):
     room_code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False, index=True)
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Set when the first peer connects; used to compute meeting duration.
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

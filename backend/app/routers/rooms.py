@@ -19,6 +19,7 @@ from app.models.meeting import MeetingNote, NoteSource
 from app.models.room import Room
 from app.models.task import Task
 from app.models.user import User
+from app.services.email_service import send_meeting_invite
 from app.services.nlp_service import extract_tasks_ner, urgency_score
 from app.services.transcription_service import transcribe_audio
 from app.utils.security import decode_token
@@ -32,11 +33,19 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
 _hub: dict[str, set[WebSocket]] = {}
 
 
+class RoomCreate(BaseModel):
+    title: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    invite_emails: list[str] = []
+
+
 class RoomResponse(BaseModel):
     id: int
     room_code: str
     created_by: int
     is_active: bool
+    title: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
     transcript: Optional[str] = None
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
@@ -74,14 +83,33 @@ async def _get_active_room(code: str, db: AsyncSession) -> Room:
 
 @router.post("", response_model=RoomResponse, status_code=201)
 async def create_room(
+    payload: RoomCreate = RoomCreate(),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     code = secrets.token_urlsafe(8)[:12]
-    room = Room(room_code=code, created_by=current_user.id)
+    room = Room(
+        room_code=code,
+        created_by=current_user.id,
+        title=payload.title or None,
+        scheduled_at=payload.scheduled_at or None,
+    )
     db.add(room)
     await db.commit()
     await db.refresh(room)
+
+    for email in payload.invite_emails:
+        try:
+            send_meeting_invite(
+                to_email=email,
+                title=payload.title or "Meeting",
+                scheduled_at=payload.scheduled_at,
+                room_code=code,
+                invited_by=current_user.name,
+            )
+        except Exception:
+            logger.warning("invite email failed for %s", email)
+
     return room
 
 

@@ -1,7 +1,8 @@
 import smtplib
-from datetime import date
+from datetime import date, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 
 from app.config import settings
 
@@ -58,6 +59,39 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     <p>Click the link below to reset your MeetMind password:</p>
     <a href="{reset_url}" style="display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none;">Reset password</a>
     <p style="margin-top:16px;color:#64748b;font-size:13px;">This link expires in 30 minutes. If you didn't request this, ignore this email.</p>
+    """
+    msg.attach(MIMEText(html, "html"))
+    _send(msg)
+
+
+def send_meeting_invite(
+    to_email: str,
+    title: str,
+    room_code: str,
+    invited_by: str,
+    scheduled_at: Optional[datetime] = None,
+) -> None:
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"You're invited: {title}"
+    msg["From"] = settings.SMTP_USER
+    msg["To"] = to_email
+
+    join_url = f"{settings.FRONTEND_URL}/dashboard/room?code={room_code}"
+    time_line = (
+        f"<p><strong>When:</strong> {scheduled_at.strftime('%A, %B %-d at %-I:%M %p')}</p>"
+        if scheduled_at else ""
+    )
+    html = f"""
+    <p>Hi,</p>
+    <p><strong>{invited_by}</strong> has invited you to a MeetMind meeting.</p>
+    <p><strong>Meeting:</strong> {title}</p>
+    {time_line}
+    <p><strong>Room code:</strong> <code>{room_code}</code></p>
+    <p>
+        <a href="{join_url}" style="display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none;">
+            Join meeting
+        </a>
+    </p>
     """
     msg.attach(MIMEText(html, "html"))
     _send(msg)
