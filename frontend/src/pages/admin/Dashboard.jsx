@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
     Users, Clock, CheckCircle, Trash2, UserCheck,
-    LayoutDashboard, Mail, Calendar, ShieldCheck, UserCircle,
+    LayoutDashboard, Mail, Calendar, ShieldCheck, UserCircle, CheckSquare,
 } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import AdminShell from "../../components/AdminShell";
@@ -10,6 +10,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/table";
+import { cn } from "../../lib/utils";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogDescription, DialogClose,
@@ -147,9 +148,19 @@ function MemberSheet({ member, open, onOpenChange, onApprove, onRemove }) {
     );
 }
 
+const PRIORITY_VARIANT = { low: "secondary", medium: "warning", high: "destructive" };
+
+function UrgencyBadge({ score }) {
+    if (score == null) return <span className="text-muted-foreground/40">--</span>;
+    if (score < 0.1) return <Badge variant="success">Low</Badge>;
+    if (score < 0.3) return <Badge variant="warning">Med</Badge>;
+    return <Badge variant="destructive">High</Badge>;
+}
+
 export default function AdminDashboard() {
     const [pending, setPending] = useState([]);
     const [members, setMembers] = useState([]);
+    const [allTasks, setAllTasks] = useState([]);
     const [confirm, setConfirm] = useState(null);
     const [selectedMember, setSelectedMember] = useState(null);
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -157,6 +168,7 @@ export default function AdminDashboard() {
     const fetchData = () => {
         adminApi.getPending().then((r) => setPending(r.data)).catch(() => {});
         adminApi.getAllUsers().then((r) => setMembers(r.data)).catch(() => {});
+        adminApi.getAllTasks().then((r) => setAllTasks(r.data)).catch(() => {});
     };
 
     useEffect(() => { fetchData(); }, []);
@@ -201,6 +213,7 @@ export default function AdminDashboard() {
                                     {[
                                         { value: "pending", label: "Pending", count: pending.length, showCount: true },
                                         { value: "members", label: "All Members", count: members.length, showCount: false },
+                                        { value: "tasks", label: "Meeting Tasks", count: allTasks.length, showCount: false },
                                     ].map(({ value, label, count, showCount }) => (
                                         <TabsTrigger
                                             key={value}
@@ -325,6 +338,61 @@ export default function AdminDashboard() {
                                         ))}
                                     </TableBody>
                                 </Table>
+                            </TabsContent>
+                            <TabsContent value="tasks" className="mt-0">
+                                {allTasks.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+                                        <CheckSquare className="h-8 w-8 opacity-30" />
+                                        <p className="text-sm">No tasks yet</p>
+                                    </div>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Title</TableHead>
+                                                <TableHead>Member</TableHead>
+                                                <TableHead>Assignee</TableHead>
+                                                <TableHead>Deadline</TableHead>
+                                                <TableHead>Priority</TableHead>
+                                                <TableHead>Urgency</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {allTasks.map((task) => (
+                                                <TableRow key={task.id} className={cn(task.is_complete && "opacity-50")}>
+                                                    <TableCell>
+                                                        <span className={cn("font-medium", task.is_complete && "line-through text-muted-foreground")}>
+                                                            {task.title}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">{task.user_name}</TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {task.assignee_name || <span className="text-muted-foreground/40">--</span>}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {task.deadline
+                                                            ? new Date(task.deadline + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                                            : <span className="text-muted-foreground/40">--</span>}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={PRIORITY_VARIANT[task.priority]} className="capitalize">
+                                                            {task.priority}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <UrgencyBadge score={task.urgency_score} />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={task.is_complete ? "success" : "secondary"}>
+                                                            {task.is_complete ? "Done" : "Pending"}
+                                                        </Badge>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
                             </TabsContent>
                         </Tabs>
                     </CardContent>

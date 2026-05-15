@@ -1,15 +1,32 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_admin
+from app.models.task import Task, TaskPriority
 from app.models.user import User
 from app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+class AdminTaskResponse(BaseModel):
+    id: int
+    user_id: int
+    user_name: str
+    meeting_note_id: Optional[int]
+    title: str
+    assignee_name: Optional[str]
+    deadline: Optional[str]
+    priority: TaskPriority
+    is_complete: bool
+    urgency_score: Optional[float]
+
+    model_config = {"from_attributes": True}
 
 
 @router.get("/users/pending", response_model=List[UserResponse])
@@ -69,3 +86,29 @@ async def remove_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     user.is_active = False
     await db.commit()
+
+
+@router.get("/tasks", response_model=List[AdminTaskResponse])
+async def list_all_tasks(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(
+        select(Task, User.name).join(User, Task.user_id == User.id).order_by(Task.created_at.desc())
+    )
+    rows = result.all()
+    out = []
+    for task, user_name in rows:
+        out.append(AdminTaskResponse(
+            id=task.id,
+            user_id=task.user_id,
+            user_name=user_name,
+            meeting_note_id=task.meeting_note_id,
+            title=task.title,
+            assignee_name=task.assignee_name,
+            deadline=task.deadline.isoformat() if task.deadline else None,
+            priority=task.priority,
+            is_complete=task.is_complete,
+            urgency_score=task.urgency_score,
+        ))
+    return out
