@@ -236,7 +236,21 @@ export default function MeetingRoom() {
     const startRecording = () => {
         if (!localStreamRef.current) return;
         chunksRef.current = [];
-        const recorder = new MediaRecorder(localStreamRef.current, { mimeType: "audio/webm" });
+
+        // Pick the first mimeType the browser actually supports.
+        // audio/webm is not supported on Safari; mp4 works on Safari and Chrome.
+        const mimeType = [
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/mp4",
+            "audio/ogg;codecs=opus",
+            "",
+        ].find((m) => m === "" || MediaRecorder.isTypeSupported(m));
+
+        const recorder = new MediaRecorder(
+            localStreamRef.current,
+            mimeType ? { mimeType } : {},
+        );
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.start(1000);
         recorderRef.current = recorder;
@@ -246,17 +260,28 @@ export default function MeetingRoom() {
     const stopAndTranscribe = () => {
         const recorder = recorderRef.current;
         if (!recorder || recorder.state !== "recording") return;
+
+        // onstop must be wired before .stop() — some browsers fire it synchronously.
         recorder.onstop = async () => {
             setRecording(false);
             setTranscribing(true);
             try {
-                const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+                if (chunksRef.current.length === 0) {
+                    throw new Error("No audio data recorded.");
+                }
+                const mimeType = recorder.mimeType || "audio/webm";
+                const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
+                const blob = new Blob(chunksRef.current, { type: mimeType });
                 const form = new FormData();
-                form.append("file", blob, "recording.webm");
+                form.append("file", blob, `recording.${ext}`);
                 const { data } = await roomsApi.transcribe(code, form);
-                navigate(`/dashboard/notes?highlight=${data.note_id}`);
-            } catch {
-                setError("Transcription failed. Try again.");
+                if (data.task_count > 0) {
+                    navigate("/dashboard/tasks");
+                } else {
+                    navigate(`/dashboard/notes?highlight=${data.note_id}`);
+                }
+            } catch (err) {
+                setError(`Transcription failed: ${err?.response?.data?.detail || err?.message || "unknown error"}`);
                 setTranscribing(false);
             }
         };

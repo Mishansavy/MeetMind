@@ -119,8 +119,7 @@ def extract_tasks_ner(text: str) -> list[ExtractedTaskPreview]:
                 title=title,
                 assignee_name=assignee,
                 priority=_priority(line),
-                # deadline_raw is a raw string surfaced to the UI; we don't parse it
-                # into a date server-side to avoid locale/ambiguity issues.
+                deadline_raw=deadline_raw,
             )
         )
 

@@ -42,6 +42,7 @@ class ExtractedTaskPreview(BaseModel):
     title: str
     assignee_name: Optional[str] = None
     deadline: Optional[date] = None
+    deadline_raw: Optional[str] = None   # raw string from NER, shown in UI preview
     priority: TaskPriority = TaskPriority.medium
     urgency_score: Optional[float] = None
 

@@ -3,8 +3,10 @@ import logging
 import os
 import secrets
 import tempfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
+
+from dateutil import parser as dateutil_parser
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel
@@ -46,6 +48,18 @@ class RoomResponse(BaseModel):
 class TranscribeResponse(BaseModel):
     note_id: int
     transcript: str
+    task_count: int
+
+
+def _parse_deadline(raw: str | None) -> date | None:
+    """Try to parse a free-form date string from NER into a date object.
+    Returns None if the string is absent or unparseable rather than raising."""
+    if not raw:
+        return None
+    try:
+        return dateutil_parser.parse(raw, fuzzy=True).date()
+    except Exception:
+        return None
 
 
 async def _get_active_room(code: str, db: AsyncSession) -> Room:
@@ -145,14 +159,16 @@ async def transcribe_room(
     workload = len(workload_result.scalars().all())
 
     for i, p in enumerate(previews):
-        # Use the NER-extracted deadline if available; urgency_score handles None.
-        score = urgency_score(p.deadline, workload + i)
+        # deadline_raw is a free-form string from spaCy ("by Friday", "next Monday").
+        # Parse it to a real date here for urgency scoring and task storage.
+        deadline = _parse_deadline(p.deadline_raw)
+        score = urgency_score(deadline, workload + i)
         task = Task(
             user_id=current_user.id,
             meeting_note_id=note.id,
             title=p.title,
             assignee_name=p.assignee_name,
-            deadline=p.deadline,
+            deadline=deadline,
             priority=p.priority,
             urgency_score=score,
         )
@@ -160,7 +176,7 @@ async def transcribe_room(
 
     await db.commit()
     await db.refresh(note)
-    return TranscribeResponse(note_id=note.id, transcript=text)
+    return TranscribeResponse(note_id=note.id, transcript=text, task_count=len(previews))
 
 
 @router.websocket("/{code}/ws")
