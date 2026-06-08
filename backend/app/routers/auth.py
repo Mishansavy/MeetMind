@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.models.meeting import MeetingNote
+from app.models.task import Task
 from app.models.user import User
 from app.schemas.user import (
     RegisterRequest, LoginRequest, TokenResponse, UserResponse,
@@ -39,9 +41,6 @@ async def me_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from app.models.meeting import MeetingNote
-    from app.models.task import Task
-
     notes_count = await db.scalar(
         select(func.count()).where(MeetingNote.user_id == current_user.id)
     )

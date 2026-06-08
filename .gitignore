@@ -8,16 +8,12 @@ __pycache__/
 .Python
 *.egg
 *.egg-info/
-dist/
-build/
 eggs/
 parts/
 var/
 sdist/
 develop-eggs/
 .installed.cfg
-lib/
-lib64/
 
 # Virtual environments
 venv/
@@ -25,11 +21,6 @@ env/
 .env/
 .venv/
 ENV/
-
-# Environment variables
-.env
-.env.local
-.env.production
 
 # pytest
 .pytest_cache/
@@ -46,19 +37,30 @@ coverage.xml
 # Node / Frontend
 # ========================
 node_modules/
-dist/
+frontend/dist/
 dist-ssr/
-build/
 .vite/
 
+# ========================
+# Build output
+# ========================
+build/
+dist/
+
+# ========================
 # Environment variables
+# ========================
 .env
 .env.local
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
 
+# ========================
 # Logs
+# ========================
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -69,13 +71,18 @@ pnpm-debug.log*
 # ========================
 *.sqlite3
 *.db
-*.sql
 dump.rdb
+
+# ========================
+# SSL certificates
+# ========================
+*.pem
+*.key
+*.crt
 
 # ========================
 # IDE / Editors
 # ========================
-.vscode/
 .idea/
 *.suo
 *.ntvs*
@@ -84,8 +91,6 @@ dump.rdb
 *.sw?
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
 
 # ========================
 # OS
@@ -102,7 +107,6 @@ Desktop.ini
 # ========================
 # Misc
 # ========================
-*.log
 *.tmp
 *.bak
 *.orig
@@ -113,7 +117,33 @@ tmp/
 # Project report (local only)
 # ========================
 MeetMind_Technical_Document.md
+MeetMind_Technical_Document.tex
 generate_diagrams.py
 docs/
-cert.pem
-key.pem
+
+# ========================
+# LaTeX build artifacts
+# ========================
+*.aux
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.idx
+*.ind
+*.ilg
+*.glo
+*.gls
+*.glg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+.out
+.pdf

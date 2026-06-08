@@ -124,8 +124,3 @@ def extract_tasks_ner(text: str) -> list[ExtractedTaskPreview]:
         )
 
     return results
-
-
-def extract_tasks_rule_based(text: str) -> list[ExtractedTaskPreview]:
-    # Alias kept for backward compatibility; NER version supersedes this.
-    return extract_tasks_ner(text)

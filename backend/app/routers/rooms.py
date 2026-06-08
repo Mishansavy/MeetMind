@@ -159,19 +159,16 @@ async def transcribe_room(
 
     raw = await file.read()
     suffix = os.path.splitext(file.filename or "audio.webm")[1] or ".webm"
-    logger.info("transcribe: received file=%s size=%d suffix=%s user=%s room=%s",
-                file.filename, len(raw), suffix, current_user.email, code)
+    logger.info("transcribe: received %d bytes from %s for room %s", len(raw), current_user.email, code)
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(raw)
         tmp_path = tmp.name
 
     try:
-        logger.info("transcribe: running whisper on %s", tmp_path)
         text = transcribe_audio(tmp_path)
-        logger.info("transcribe: whisper result: %r", text[:200])
     except Exception as exc:
-        logger.error("transcribe: whisper failed: %s", exc, exc_info=True)
+        logger.error("transcribe: whisper failed for room %s: %s", code, exc, exc_info=True)
         raise
     finally:
         os.unlink(tmp_path)
@@ -193,10 +190,6 @@ async def transcribe_room(
     await db.flush()
 
     previews = extract_tasks_ner(text)
-    logger.info("transcribe: NLP extracted %d tasks from transcript", len(previews))
-    for p in previews:
-        logger.info("  task: %r  assignee=%s  deadline_raw=%s  priority=%s",
-                    p.title, p.assignee_name, p.deadline_raw, p.priority)
 
     workload_result = await db.execute(
         select(Task).where(Task.user_id == current_user.id, Task.is_complete.is_(False))
@@ -205,8 +198,6 @@ async def transcribe_room(
 
     for i, p in enumerate(previews):
         deadline = _parse_deadline(p.deadline_raw)
-        score = urgency_score(deadline, workload + i)
-        logger.info("  saving task %d: deadline=%s score=%s", i, deadline, score)
         task = Task(
             user_id=current_user.id,
             meeting_note_id=note.id,
@@ -214,13 +205,13 @@ async def transcribe_room(
             assignee_name=p.assignee_name,
             deadline=deadline,
             priority=p.priority,
-            urgency_score=score,
+            urgency_score=urgency_score(deadline, workload + i),
         )
         db.add(task)
 
     await db.commit()
     await db.refresh(note)
-    logger.info("transcribe: done note_id=%d task_count=%d", note.id, len(previews))
+    logger.info("transcribe: room %s -> note %d, %d tasks", code, note.id, len(previews))
     return TranscribeResponse(note_id=note.id, transcript=text, task_count=len(previews))
 
 

@@ -36,9 +36,9 @@ async def list_pending_users(
 ):
     result = await db.execute(
         select(User).where(
-            User.is_email_verified == True,
-            User.is_approved == False,
-            User.is_active == True,
+            User.is_email_verified.is_(True),
+            User.is_approved.is_(False),
+            User.is_active.is_(True),
         )
     )
     return result.scalars().all()
@@ -49,7 +49,7 @@ async def list_all_users(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    result = await db.execute(select(User).where(User.is_active == True))
+    result = await db.execute(select(User).where(User.is_active.is_(True)))
     return result.scalars().all()
 
 

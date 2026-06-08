@@ -53,10 +53,10 @@ async def create_task(user_id: int, payload: TaskCreate, db: AsyncSession) -> Ta
 
 async def update_task(task_id: int, user_id: int, payload: TaskUpdate, db: AsyncSession) -> Task:
     task = await get_task(task_id, user_id, db)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(task, field, value)
-    # Recompute urgency if deadline changed
-    if "deadline" in payload.model_dump(exclude_unset=True):
+    if "deadline" in changes:
         workload = await _pending_count(user_id, db)
         task.urgency_score = compute_urgency(task.deadline, workload)
     await db.commit()

@@ -53,7 +53,7 @@ async def extract_tasks(
     db: AsyncSession = Depends(get_db),
 ):
     note = await meeting_service.get_note(note_id, current_user.id, db)
-    return nlp_service.extract_tasks_rule_based(note.content)
+    return nlp_service.extract_tasks_ner(note.content)
 
 
 @router.post("/meetings/{note_id}/tasks", response_model=list[TaskResponse], status_code=201)

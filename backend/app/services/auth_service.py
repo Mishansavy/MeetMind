@@ -1,4 +1,3 @@
-import random
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -85,7 +84,7 @@ async def request_otp(email: str, db: AsyncSession) -> dict:
     if not user.is_email_verified or not user.is_approved:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not active.")
 
-    otp = f"{random.randint(0, 999999):06d}"
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     # Store a bcrypt hash of the OTP — if the DB is ever compromised, raw codes
     # are not exposed. 10-minute window balances convenience against brute-force risk.
     user.otp_code = hash_password(otp)
