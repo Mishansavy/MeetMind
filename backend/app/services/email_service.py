@@ -64,6 +64,24 @@ def send_password_reset_email(to_email: str, token: str) -> None:
     _send(msg)
 
 
+def send_employee_invite_email(to_email: str, name: str, token: str) -> None:
+    set_password_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "You've been added to MeetMind"
+    msg["From"] = settings.SMTP_USER
+    msg["To"] = to_email
+
+    html = f"""
+    <p>Hi {name},</p>
+    <p>An admin has added you as an employee on MeetMind. Set your password to activate your account:</p>
+    <a href="{set_password_url}" style="display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none;">Set password</a>
+    <p style="margin-top:16px;color:#64748b;font-size:13px;">This link expires in 7 days.</p>
+    """
+    msg.attach(MIMEText(html, "html"))
+    _send(msg)
+
+
 def send_meeting_invite(
     to_email: str,
     title: str,
@@ -106,7 +124,7 @@ def send_reminder_email(to_email: str, name: str, task_title: str, deadline: dat
     formatted = deadline.strftime("%A, %B %-d")
     html = f"""
     <p>Hi {name},</p>
-    <p>Just a heads-up — the following task is due <strong>tomorrow ({formatted})</strong>:</p>
+    <p>Just a heads-up, the following task is due <strong>tomorrow ({formatted})</strong>:</p>
     <blockquote style="border-left:3px solid #3b82f6;padding-left:12px;color:#1e293b;">
         {task_title}
     </blockquote>

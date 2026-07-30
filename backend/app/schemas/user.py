@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -54,6 +55,28 @@ class UserResponse(BaseModel):
     role: str
     is_email_verified: bool
     is_approved: bool
+    employee_id: Optional[str] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
+    join_date: Optional[date] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EmployeeUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    employee_id: Optional[str] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
+    join_date: Optional[date] = None
+
+
+class EmployeeCreate(BaseModel):
+    name: str
+    email: EmailStr
+    employee_id: Optional[str] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
+    join_date: Optional[date] = None

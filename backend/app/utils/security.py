@@ -36,10 +36,16 @@ def create_password_reset_token(email: str) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def create_invite_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=7)
+    payload = {"sub": email, "type": "invite", "exp": expire}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
 def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
-        # Treat any decode failure (expired, tampered, wrong key) uniformly — callers
+        # Treat any decode failure (expired, tampered, wrong key) uniformly, callers
         # check for an empty dict and raise the appropriate HTTP error themselves.
         return {}
