@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import auth, admin, meetings, tasks, analytics, rooms
+from app.routers import auth, admin, meetings, tasks, analytics, rooms, employees, attendance
 from app.services.scheduler_service import start_scheduler, stop_scheduler
 
 _log_path = os.path.join(os.path.dirname(__file__), "..", "..", "meetmind.log")
@@ -48,6 +48,8 @@ app.include_router(meetings.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(rooms.router, prefix="/api/v1")
+app.include_router(employees.router, prefix="/api/v1")
+app.include_router(attendance.router, prefix="/api/v1")
 
 
 @app.get("/health")

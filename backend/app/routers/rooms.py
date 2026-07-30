@@ -9,6 +9,7 @@ from typing import Optional
 from dateutil import parser as dateutil_parser
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models.meeting import MeetingNote, NoteSource
+from app.models.recording import Recording
 from app.models.room import Room
 from app.models.task import Task
 from app.models.user import User
@@ -27,8 +29,12 @@ from app.utils.security import decode_token
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
+# Local disk storage for meeting recordings, alongside the app rather than in a temp dir
+# since these need to persist after the request completes.
+RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "recordings")
+
 # In-process signaling hub: room_code → set of connected WebSocket connections.
-# Scoped to this process — not shared across workers, which is fine for a single-server
+# Scoped to this process, not shared across workers, which is fine for a single-server
 # deployment. Multi-server would need a Redis pub/sub backend instead.
 _hub: dict[str, set[WebSocket]] = {}
 
@@ -58,6 +64,17 @@ class TranscribeResponse(BaseModel):
     note_id: int
     transcript: str
     task_count: int
+
+
+class RecordingResponse(BaseModel):
+    id: int
+    room_id: int
+    user_id: int
+    mime_type: str
+    size_bytes: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 def _parse_deadline(raw: str | None) -> date | None:
@@ -215,6 +232,83 @@ async def transcribe_room(
     return TranscribeResponse(note_id=note.id, transcript=text, task_count=len(previews))
 
 
+@router.post("/{code}/recordings", response_model=RecordingResponse, status_code=201)
+async def upload_recording(
+    code: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store a participant's self-view video+audio recording for a meeting.
+
+    Mesh P2P has no server-side stream mixing, so each participant records their
+    own camera/mic locally and uploads it here -- a meeting ends up with one
+    recording per participant rather than a single composited video.
+    """
+    result = await db.execute(select(Room).where(Room.room_code == code))
+    room = result.scalar_one_or_none()
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found.")
+
+    raw = await file.read()
+    suffix = os.path.splitext(file.filename or "recording.webm")[1] or ".webm"
+    mime_type = file.content_type or "video/webm"
+
+    os.makedirs(RECORDINGS_DIR, exist_ok=True)
+    stored_name = f"{code}_{current_user.id}_{secrets.token_hex(8)}{suffix}"
+    stored_path = os.path.join(RECORDINGS_DIR, stored_name)
+    with open(stored_path, "wb") as f:
+        f.write(raw)
+
+    recording = Recording(
+        room_id=room.id,
+        user_id=current_user.id,
+        file_path=stored_name,
+        mime_type=mime_type,
+        size_bytes=len(raw),
+    )
+    db.add(recording)
+    await db.commit()
+    await db.refresh(recording)
+    logger.info("recording: stored %d bytes for room %s user %s", len(raw), code, current_user.email)
+    return recording
+
+
+@router.get("/{code}/recordings", response_model=list[RecordingResponse])
+async def list_recordings(
+    code: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Room).where(Room.room_code == code))
+    room = result.scalar_one_or_none()
+    if not room:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found.")
+
+    result = await db.execute(
+        select(Recording).where(Recording.room_id == room.id).order_by(Recording.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.get("/recordings/{recording_id}/file")
+async def download_recording(
+    recording_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Recording).where(Recording.id == recording_id))
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found.")
+
+    path = os.path.join(RECORDINGS_DIR, recording.file_path)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording file missing.")
+
+    return FileResponse(path, media_type=recording.mime_type, filename=recording.file_path)
+
+
 @router.websocket("/{code}/ws")
 async def room_ws(
     code: str,
@@ -225,7 +319,7 @@ async def room_ws(
     """WebSocket signaling channel for WebRTC peer negotiation.
 
     Auth is via a ?token= query param instead of an Authorization header because
-    the browser WebSocket API does not support custom headers — only query params
+    the browser WebSocket API does not support custom headers, only query params
     and cookies are available at connection time.
 
     The hub forwards all messages to every other peer in the room. Peers use these
@@ -296,6 +390,6 @@ async def _broadcast(code: str, payload: dict, exclude: Optional[WebSocket] = No
         try:
             await ws.send_text(json.dumps(payload))
         except Exception:
-            # Socket died mid-send — collect and remove after iteration.
+            # Socket died mid-send, collect and remove after iteration.
             dead.add(ws)
     peers -= dead

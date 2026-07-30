@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Check, Captions, CaptionsOff, Loader2, Circle, Square } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Copy, Check, Captions, CaptionsOff, Loader2, Circle, Square, Film, X } from "lucide-react";
 import Peer from "peerjs";
 import { useAuth } from "../../context/AuthContext";
 import { roomsApi } from "../../api/rooms";
@@ -8,6 +8,88 @@ import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 
 const WS_BASE = import.meta.env.VITE_WS_URL || "ws://localhost:8000/api/v1";
+
+// cap resolution/fps so we don't always grab max camera quality
+const MEDIA_CONSTRAINTS = {
+    video: { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { max: 30 } },
+    audio: true,
+};
+
+const BITRATE_STEPS = [150_000, 300_000, 600_000, 1_200_000, 2_500_000];
+const STATS_INTERVAL_MS = 4000;
+
+// steps a peer connection's outbound video bitrate up/down based on loss + achieved throughput
+function startBitrateController(peerConnection) {
+    let stepIndex = BITRATE_STEPS.length - 1;
+    let lastBytesSent = null;
+    let lastTimestamp = null;
+    let cancelled = false;
+
+    const applyStep = async () => {
+        const sender = peerConnection.getSenders().find((s) => s.track && s.track.kind === "video");
+        if (!sender) return;
+        try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+            params.encodings[0].maxBitrate = BITRATE_STEPS[stepIndex];
+            await sender.setParameters(params);
+        } catch {
+            // negotiation mid-flight, skip this tick
+        }
+    };
+
+    const tick = async () => {
+        if (cancelled) return;
+        const sender = peerConnection.getSenders().find((s) => s.track && s.track.kind === "video");
+        if (!sender) return;
+
+        try {
+            const stats = await sender.getStats();
+            let packetsLost = 0;
+            let packetsSent = 0;
+            let bytesSent = null;
+            let timestamp = null;
+
+            stats.forEach((report) => {
+                if (report.type === "remote-inbound-rtp" && report.kind === "video") {
+                    packetsLost += report.packetsLost || 0;
+                }
+                if (report.type === "outbound-rtp" && report.kind === "video") {
+                    packetsSent += report.packetsSent || 0;
+                    bytesSent = report.bytesSent;
+                    timestamp = report.timestamp;
+                }
+            });
+
+            const lossRatio = packetsSent > 0 ? packetsLost / packetsSent : 0;
+
+            let sendingSlowerThanTarget = false;
+            if (lastBytesSent != null && bytesSent != null && timestamp > lastTimestamp) {
+                const achievedBps = ((bytesSent - lastBytesSent) * 8) / ((timestamp - lastTimestamp) / 1000);
+                sendingSlowerThanTarget = achievedBps < BITRATE_STEPS[stepIndex] * 0.6;
+            }
+            lastBytesSent = bytesSent;
+            lastTimestamp = timestamp;
+
+            if (lossRatio > 0.05 || sendingSlowerThanTarget) {
+                stepIndex = Math.max(0, stepIndex - 1);
+                await applyStep();
+            } else if (lossRatio < 0.01 && stepIndex < BITRATE_STEPS.length - 1) {
+                stepIndex = Math.min(BITRATE_STEPS.length - 1, stepIndex + 1);
+                await applyStep();
+            }
+        } catch {
+            // transient right after connection setup
+        }
+    };
+
+    applyStep();
+    const intervalId = setInterval(tick, STATS_INTERVAL_MS);
+    return () => {
+        cancelled = true;
+        clearInterval(intervalId);
+    };
+}
 
 function VideoTile({ stream, label, muted = false }) {
     const ref = useRef(null);
@@ -36,7 +118,7 @@ function StatusPill({ recording, transcribing }) {
         return (
             <div className="flex items-center gap-1.5 bg-indigo-600/20 border border-indigo-500/40 text-indigo-300 text-xs px-3 py-1 rounded-full">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Transcribing — please wait…
+                Transcribing, please wait...
             </div>
         );
     }
@@ -44,7 +126,7 @@ function StatusPill({ recording, transcribing }) {
         return (
             <div className="flex items-center gap-1.5 bg-red-600/20 border border-red-500/40 text-red-400 text-xs px-3 py-1 rounded-full animate-pulse">
                 <span className="h-2 w-2 rounded-full bg-red-500 inline-block" />
-                Recording — click Stop to transcribe
+                Recording, click Stop to transcribe
             </div>
         );
     }
@@ -75,11 +157,18 @@ export default function MeetingRoom() {
     const [transcribing, setTranscribing] = useState(false);
     const recorderRef = useRef(null);
     const chunksRef = useRef([]);
+    const videoRecorderRef = useRef(null);
+    const videoChunksRef = useRef([]);
+
+    const [recordingsOpen, setRecordingsOpen] = useState(false);
+    const [recordings, setRecordings] = useState([]);
+    const [playbackUrl, setPlaybackUrl] = useState(null);
 
     const peerRef = useRef(null);
     const wsRef = useRef(null);
     const callsRef = useRef({});
     const localStreamRef = useRef(null);
+    const bitrateStopFnsRef = useRef({});
 
     const addPeer = useCallback((id, stream, name) => {
         setPeers((prev) => ({ ...prev, [id]: { stream, name } }));
@@ -149,7 +238,7 @@ export default function MeetingRoom() {
         });
 
         navigator.mediaDevices
-            .getUserMedia({ video: true, audio: true })
+            .getUserMedia(MEDIA_CONSTRAINTS)
             .then((stream) => {
                 if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
                 localStreamRef.current = stream;
@@ -176,11 +265,18 @@ export default function MeetingRoom() {
                             const call = peer.call(msg.peerId, stream, { metadata: { name: user.name } });
                             callsRef.current[msg.peerId] = call;
                             call.on("stream", (remoteStream) => addPeer(msg.peerId, remoteStream, msg.name));
-                            call.on("close", () => removePeer(msg.peerId));
+                            call.on("close", () => { bitrateStopFnsRef.current[msg.peerId]?.(); delete bitrateStopFnsRef.current[msg.peerId]; removePeer(msg.peerId); });
+                            call.peerConnection?.addEventListener("connectionstatechange", () => {
+                                if (call.peerConnection.connectionState === "connected" && !bitrateStopFnsRef.current[msg.peerId]) {
+                                    bitrateStopFnsRef.current[msg.peerId] = startBitrateController(call.peerConnection);
+                                }
+                            });
                         }
                         if (msg.event === "peer-left") {
                             callsRef.current[msg.peerId]?.close();
                             delete callsRef.current[msg.peerId];
+                            bitrateStopFnsRef.current[msg.peerId]?.();
+                            delete bitrateStopFnsRef.current[msg.peerId];
                             removePeer(msg.peerId);
                         }
                         if (msg.event === "caption" && msg.speaker && msg.text) {
@@ -197,7 +293,12 @@ export default function MeetingRoom() {
                     call.answer(stream);
                     callsRef.current[call.peer] = call;
                     call.on("stream", (remoteStream) => addPeer(call.peer, remoteStream, call.metadata?.name || "Guest"));
-                    call.on("close", () => removePeer(call.peer));
+                    call.on("close", () => { bitrateStopFnsRef.current[call.peer]?.(); delete bitrateStopFnsRef.current[call.peer]; removePeer(call.peer); });
+                    call.peerConnection?.addEventListener("connectionstatechange", () => {
+                        if (call.peerConnection.connectionState === "connected" && !bitrateStopFnsRef.current[call.peer]) {
+                            bitrateStopFnsRef.current[call.peer] = startBitrateController(call.peerConnection);
+                        }
+                    });
                 });
 
                 peer.on("error", (err) => {
@@ -210,9 +311,12 @@ export default function MeetingRoom() {
             cancelled = true;
             recognitionRef.current?.stop();
             recorderRef.current?.state === "recording" && recorderRef.current.stop();
+            videoRecorderRef.current?.state === "recording" && videoRecorderRef.current.stop();
             wsRef.current?.close();
             peerRef.current?.destroy();
             localStreamRef.current?.getTracks().forEach((t) => t.stop());
+            Object.values(bitrateStopFnsRef.current).forEach((stop) => stop());
+            bitrateStopFnsRef.current = {};
         };
     }, [code, user, addPeer, removePeer, addCaption]);
 
@@ -229,6 +333,7 @@ export default function MeetingRoom() {
 
     const handleLeave = () => {
         recognitionRef.current?.stop();
+        videoRecorderRef.current?.state === "recording" && videoRecorderRef.current.stop();
         wsRef.current?.close();
         peerRef.current?.destroy();
         localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -274,13 +379,66 @@ export default function MeetingRoom() {
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorderRef.current = recorder;
         setRecording(true);
+
+        // separate recorder captures self-view video+audio for the meeting recording feature
+        videoChunksRef.current = [];
+        const videoMime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+            .find((m) => MediaRecorder.isTypeSupported(m));
+        try {
+            const videoRecorder = videoMime
+                ? new MediaRecorder(localStreamRef.current, { mimeType: videoMime })
+                : new MediaRecorder(localStreamRef.current);
+            videoRecorder.ondataavailable = (e) => { if (e.data.size > 0) videoChunksRef.current.push(e.data); };
+            videoRecorder.start(1000);
+            videoRecorderRef.current = videoRecorder;
+        } catch {
+            // video recording is best-effort -- transcription still works without it
+        }
+    };
+
+    const uploadVideoRecording = () => {
+        const recorder = videoRecorderRef.current;
+        if (!recorder || recorder.state !== "recording") return;
+        recorder.onstop = async () => {
+            if (videoChunksRef.current.length === 0) return;
+            const mimeType = recorder.mimeType || "video/webm";
+            const blob = new Blob(videoChunksRef.current, { type: mimeType });
+            const form = new FormData();
+            form.append("file", blob, "recording.webm");
+            try {
+                await roomsApi.uploadRecording(code, form);
+                loadRecordings();
+            } catch {
+                // best-effort -- transcript/notes flow already succeeded independently
+            }
+        };
+        recorder.stop();
+    };
+
+    const loadRecordings = useCallback(() => {
+        if (!code) return;
+        roomsApi.listRecordings(code).then(({ data }) => setRecordings(data)).catch(() => {});
+    }, [code]);
+
+    useEffect(() => { loadRecordings(); }, [loadRecordings]);
+
+    const playRecording = async (id) => {
+        const { data } = await roomsApi.downloadRecording(id);
+        setPlaybackUrl(URL.createObjectURL(data));
+    };
+
+    const closePlayback = () => {
+        if (playbackUrl) URL.revokeObjectURL(playbackUrl);
+        setPlaybackUrl(null);
     };
 
     const stopAndTranscribe = () => {
         const recorder = recorderRef.current;
         if (!recorder || recorder.state !== "recording") return;
 
-        // onstop must be wired before .stop() — some browsers fire it synchronously.
+        uploadVideoRecording();
+
+        // onstop must be wired before .stop(), some browsers fire it synchronously.
         recorder.onstop = async () => {
             setRecording(false);
             setTranscribing(true);
@@ -313,21 +471,66 @@ export default function MeetingRoom() {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-950 flex flex-col">
+        <div className="min-h-screen bg-slate-950 flex flex-col relative">
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
                 <span className="text-sm font-semibold text-white">MeetMind</span>
 
                 <StatusPill recording={recording} transcribing={transcribing} />
 
-                <button
-                    onClick={copyCode}
-                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
-                >
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span className="font-mono">{code}</span>
-                </button>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setRecordingsOpen((v) => !v)}
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                    >
+                        <Film className="h-3.5 w-3.5" />
+                        Recordings{recordings.length > 0 && ` (${recordings.length})`}
+                    </button>
+                    <button
+                        onClick={copyCode}
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                    >
+                        {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        <span className="font-mono">{code}</span>
+                    </button>
+                </div>
             </div>
+
+            {recordingsOpen && (
+                <div className="absolute right-5 top-14 z-20 w-72 bg-slate-900 border border-slate-800 rounded-lg shadow-xl overflow-hidden">
+                    <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-300">Meeting recordings</span>
+                        <button onClick={() => setRecordingsOpen(false)} className="text-slate-500 hover:text-white">
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                    {recordings.length === 0 ? (
+                        <p className="text-xs text-slate-500 px-3 py-4">No recordings yet for this meeting.</p>
+                    ) : (
+                        <ul className="max-h-64 overflow-y-auto divide-y divide-slate-800">
+                            {recordings.map((r) => (
+                                <li key={r.id}>
+                                    <button
+                                        onClick={() => playRecording(r.id)}
+                                        className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 transition-colors"
+                                    >
+                                        {new Date(r.created_at).toLocaleString()} · {(r.size_bytes / 1_000_000).toFixed(1)} MB
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
+
+            {playbackUrl && (
+                <div className="fixed inset-0 z-30 bg-black/80 flex items-center justify-center p-6" onClick={closePlayback}>
+                    <div className="max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+                        <video src={playbackUrl} controls autoPlay className="w-full rounded-lg" />
+                        <Button size="sm" variant="outline" className="mt-3" onClick={closePlayback}>Close</Button>
+                    </div>
+                </div>
+            )}
 
             {/* Video grid */}
             <div className="flex-1 p-4 overflow-auto relative">

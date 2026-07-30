@@ -67,6 +67,11 @@ yarn-error.log*
 pnpm-debug.log*
 
 # ========================
+# Uploaded recordings
+# ========================
+backend/uploads/
+
+# ========================
 # Database
 # ========================
 *.sqlite3
