@@ -274,7 +274,7 @@ function NewNoteDialog({ open, onOpenChange, onCreated }) {
                         <Label htmlFor="note-title">Title</Label>
                         <Input
                             id="note-title"
-                            placeholder="e.g. Sprint planning — Apr 26"
+                            placeholder="e.g. Sprint planning, Apr 26"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             required

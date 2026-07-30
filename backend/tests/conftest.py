@@ -2,7 +2,7 @@
 Shared fixtures for the test suite.
 
 Each test function gets a fresh async engine and transaction that is rolled back
-on teardown — tests are isolated without dropping/recreating tables between them.
+on teardown, tests are isolated without dropping/recreating tables between them.
 
 The test database (meetmind_test) is created once via a synchronous psycopg2
 connection so we avoid asyncpg event-loop-scope issues at session level.

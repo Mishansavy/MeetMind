@@ -7,7 +7,7 @@ import spacy
 from app.models.task import TaskPriority
 from app.schemas.task import ExtractedTaskPreview
 
-# spaCy model loaded once at import time — reloading per request would add ~300ms latency.
+# spaCy model loaded once at import time, reloading per request would add ~300ms latency.
 _nlp = spacy.load("en_core_web_sm")
 
 # Sentence boundary split on .!? followed by whitespace.
@@ -20,7 +20,7 @@ _ACTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Keyword-based priority signals — high beats low, anything else is medium.
+# Keyword-based priority signals, high beats low, anything else is medium.
 _HIGH_RE = re.compile(r"\b(urgent|asap|immediately|critical|today)\b", re.IGNORECASE)
 _LOW_RE = re.compile(r"\b(eventually|someday|nice[- ]to[- ]have|low priority)\b", re.IGNORECASE)
 
@@ -108,7 +108,7 @@ def extract_tasks_ner(text: str) -> list[ExtractedTaskPreview]:
             elif ent.label_ in ("DATE", "TIME") and deadline_raw is None:
                 deadline_raw = ent.text.strip()
 
-        # spaCy sometimes misses short relative phrases — this regex catches "by Friday" etc.
+        # spaCy sometimes misses short relative phrases, this regex catches "by Friday" etc.
         if deadline_raw is None:
             m = _DATE_PHRASE_RE.search(line)
             if m:

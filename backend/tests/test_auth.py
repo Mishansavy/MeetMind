@@ -1,4 +1,4 @@
-"""Integration tests for authentication endpoints — hits real Postgres."""
+"""Integration tests for authentication endpoints, hits real Postgres."""
 
 from unittest.mock import patch
 
@@ -118,7 +118,7 @@ class TestMe:
 class TestOtp:
     @pytest.mark.asyncio
     async def test_otp_request_returns_generic_message(self, client):
-        # Should return success even for non-existent email — prevents enumeration.
+        # Should return success even for non-existent email, prevents enumeration.
         with patch("app.services.auth_service.send_otp_email"):
             resp = await client.post("/api/v1/auth/otp/request", json={"email": "nobody@example.com"})
         assert resp.status_code == 200

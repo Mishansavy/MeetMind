@@ -1,4 +1,4 @@
-"""Tests for pure utility functions in app/utils/security.py — no DB required."""
+"""Tests for pure utility functions in app/utils/security.py, no DB required."""
 
 import time
 from datetime import datetime, timedelta, timezone

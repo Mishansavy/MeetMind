@@ -1,4 +1,4 @@
-"""Tests for nlp_service — pure functions, no DB or network required."""
+"""Tests for nlp_service, pure functions, no DB or network required."""
 
 from datetime import date, timedelta
 
@@ -60,7 +60,7 @@ class TestExtractTasksNer:
         assert results == []
 
     def test_high_priority_detected(self):
-        text = "This is urgent — John must fix the bug immediately."
+        text = "This is urgent, John must fix the bug immediately."
         results = extract_tasks_ner(text)
         assert len(results) >= 1
         assert results[0].priority == TaskPriority.high

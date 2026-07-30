@@ -13,7 +13,7 @@ from app.services.email_service import send_reminder_email
 
 logger = logging.getLogger(__name__)
 
-# Module-level scheduler instance — shared across the app lifespan.
+# Module-level scheduler instance, shared across the app lifespan.
 scheduler = AsyncIOScheduler()
 
 
@@ -21,7 +21,7 @@ async def send_task_reminders() -> None:
     """Query all incomplete tasks due tomorrow and email each owner a reminder.
 
     Opens its own DB session rather than using FastAPI's Depends(get_db) because
-    APScheduler jobs run outside the request lifecycle — there's no active request
+    APScheduler jobs run outside the request lifecycle, there's no active request
     to inject a session into.
     """
     tomorrow = date.today() + timedelta(days=1)
@@ -42,7 +42,7 @@ async def send_task_reminders() -> None:
                 deadline=task.deadline,
             )
         except Exception:
-            # Log and continue — one failed email shouldn't stop the rest.
+            # Log and continue, one failed email shouldn't stop the rest.
             logger.exception("Failed to send reminder for task %d", task.id)
 
 

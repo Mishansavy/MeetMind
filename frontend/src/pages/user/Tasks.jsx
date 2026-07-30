@@ -14,7 +14,7 @@ import { cn } from "../../lib/utils";
 const PRIORITY_VARIANT = { low: "secondary", medium: "warning", high: "destructive" };
 
 function UrgencyBadge({ score }) {
-    if (score == null) return <span className="text-muted-foreground/40">—</span>;
+    if (score == null) return <span className="text-muted-foreground/40">-</span>;
     if (score < 0.1) return <Badge variant="success">Low</Badge>;
     if (score < 0.3) return <Badge variant="warning">Medium</Badge>;
     return <Badge variant="destructive">High</Badge>;
@@ -204,12 +204,12 @@ export default function Tasks() {
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
-                                            {task.assignee_name || <span className="text-muted-foreground/40">—</span>}
+                                            {task.assignee_name || <span className="text-muted-foreground/40">-</span>}
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
                                             {task.deadline
                                                 ? new Date(task.deadline + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                                                : <span className="text-muted-foreground/40">—</span>}
+                                                : <span className="text-muted-foreground/40">-</span>}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={PRIORITY_VARIANT[task.priority]} className="capitalize">

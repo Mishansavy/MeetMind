@@ -1,5 +1,5 @@
 """
-Seed script — run once to populate initial data.
+Seed script, run once to populate initial data.
 
 Usage:
     python seed.py
