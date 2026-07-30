@@ -9,7 +9,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import UserDashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
-import AdminMembers from "./pages/admin/Members";
+import AdminEmployees from "./pages/admin/Employees";
+import AdminAttendance from "./pages/admin/Attendance";
 import MeetingNotes from "./pages/user/MeetingNotes";
 import Tasks from "./pages/user/Tasks";
 import Analytics from "./pages/user/Analytics";
@@ -86,10 +87,18 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/members"
+            path="/admin/employees"
             element={
               <ProtectedRoute requiredRole="admin">
-                <AdminMembers />
+                <AdminEmployees />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/attendance"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminAttendance />
               </ProtectedRoute>
             }
           />

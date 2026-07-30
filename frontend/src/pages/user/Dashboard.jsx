@@ -1,11 +1,67 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, CheckSquare, BarChart2, Video, ArrowRight, TrendingUp } from "lucide-react";
+import { FileText, CheckSquare, BarChart2, Video, ArrowRight, TrendingUp, Clock, LogIn, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { authApi } from "../../api/auth";
+import { attendanceApi } from "../../api/attendance";
 import AppShell from "../../components/AppShell";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+
+function fmtTime(iso) {
+    if (!iso) return null;
+    return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+}
+
+function AttendanceCard() {
+    const [today, setToday] = useState(null);
+    const [loading, setLoading] = useState(false);
+
+    const refresh = () => attendanceApi.getToday().then((r) => setToday(r.data)).catch(() => {});
+
+    useEffect(() => { refresh(); }, []);
+
+    const handleCheckIn = async () => {
+        setLoading(true);
+        try { await attendanceApi.checkIn(); await refresh(); } finally { setLoading(false); }
+    };
+
+    const handleCheckOut = async () => {
+        setLoading(true);
+        try { await attendanceApi.checkOut(); await refresh(); } finally { setLoading(false); }
+    };
+
+    return (
+        <Card>
+            <CardContent className="p-5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600">
+                        <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold">Today's attendance</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            {today?.check_in_at
+                                ? `Checked in at ${fmtTime(today.check_in_at)}${today.check_out_at ? ` · out at ${fmtTime(today.check_out_at)}` : ""}`
+                                : "You haven't checked in yet."}
+                        </p>
+                    </div>
+                </div>
+                {!today?.check_in_at ? (
+                    <Button size="sm" onClick={handleCheckIn} disabled={loading} className="gap-1.5">
+                        <LogIn className="h-3.5 w-3.5" /> Check in
+                    </Button>
+                ) : !today?.check_out_at ? (
+                    <Button size="sm" variant="outline" onClick={handleCheckOut} disabled={loading} className="gap-1.5">
+                        <LogOut className="h-3.5 w-3.5" /> Check out
+                    </Button>
+                ) : (
+                    <span className="text-xs text-muted-foreground">Done for today</span>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
 
 function StatCard({ label, value, icon: Icon, color, sub }) {
     return (
@@ -71,25 +127,27 @@ export default function UserDashboard() {
             </div>
 
             <div className="space-y-8 animate-fade-in">
+                <AttendanceCard />
+
                 {/* Stat row */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <StatCard
                         label="Meeting Notes"
-                        value={stats ? stats.meetings : "—"}
+                        value={stats ? stats.meetings : "-"}
                         icon={FileText}
                         color="bg-violet-50 text-violet-600"
                         sub={stats?.meetings === 1 ? "1 note saved" : stats ? `${stats.meetings} notes saved` : null}
                     />
                     <StatCard
                         label="Tasks Pending"
-                        value={stats ? stats.tasks_pending : "—"}
+                        value={stats ? stats.tasks_pending : "-"}
                         icon={CheckSquare}
                         color="bg-amber-50 text-amber-600"
                         sub={stats?.tasks_pending === 0 ? "All caught up" : null}
                     />
                     <StatCard
                         label="Meetings This Week"
-                        value="—"
+                        value="-"
                         icon={TrendingUp}
                         color="bg-blue-50 text-blue-600"
                         sub="View trends in analytics"
