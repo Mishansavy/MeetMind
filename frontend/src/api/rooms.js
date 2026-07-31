@@ -12,5 +12,7 @@ export const roomsApi = {
     }),
     listRecordings: (code) => api.get(`/rooms/${code}/recordings`),
     myRecordings: () => api.get("/rooms/recordings/mine"),
+    sharedWithMe: () => api.get("/rooms/recordings/shared-with-me"),
+    shareRecording: (id, email) => api.post(`/rooms/recordings/${id}/share`, { email }),
     downloadRecording: (id) => api.get(`/rooms/recordings/${id}/file`, { responseType: "blob" }),
 };

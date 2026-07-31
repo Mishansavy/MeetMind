@@ -18,10 +18,11 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_admin
 from app.models.meeting import MeetingNote, NoteSource
 from app.models.recording import Recording
+from app.models.recording_share import RecordingShare
 from app.models.room import Room
 from app.models.task import Task
 from app.models.user import User
-from app.services.email_service import send_meeting_invite
+from app.services.email_service import send_meeting_invite, send_recording_shared_email
 from app.services.nlp_service import extract_tasks_ner, urgency_score
 from app.services.transcription_service import transcribe_audio
 from app.utils.security import decode_token
@@ -85,6 +86,23 @@ class MyRecordingResponse(BaseModel):
     mime_type: str
     size_bytes: int
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ShareRecordingRequest(BaseModel):
+    email: str
+
+
+class SharedRecordingResponse(BaseModel):
+    id: int
+    recording_id: int
+    room_code: str
+    room_title: Optional[str] = None
+    mime_type: str
+    size_bytes: int
+    shared_by_name: str
+    shared_at: datetime
 
     model_config = {"from_attributes": True}
 
@@ -329,6 +347,84 @@ async def list_my_recordings(
     ]
 
 
+@router.post("/recordings/{recording_id}/share", status_code=201)
+async def share_recording(
+    recording_id: int,
+    payload: ShareRecordingRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Recording).where(Recording.id == recording_id))
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found.")
+    if recording.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to share this recording.")
+
+    result = await db.execute(select(User).where(User.email == payload.email))
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No user with that email.")
+    if target.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have access to this recording.")
+
+    result = await db.execute(
+        select(RecordingShare).where(
+            RecordingShare.recording_id == recording_id,
+            RecordingShare.shared_with_user_id == target.id,
+        )
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already shared with this user.")
+
+    share = RecordingShare(
+        recording_id=recording_id,
+        shared_with_user_id=target.id,
+        shared_by_user_id=current_user.id,
+    )
+    db.add(share)
+    await db.commit()
+
+    result = await db.execute(select(Room).where(Room.id == recording.room_id))
+    room = result.scalar_one_or_none()
+    try:
+        send_recording_shared_email(target.email, current_user.name, room.title if room else None)
+    except Exception:
+        logger.warning("recording share email failed for %s", target.email)
+
+    logger.info("recording: %d shared by %s with %s", recording_id, current_user.email, target.email)
+    return {"detail": "Recording shared."}
+
+
+@router.get("/recordings/shared-with-me", response_model=list[SharedRecordingResponse])
+async def list_shared_recordings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(RecordingShare, Recording, Room.room_code, Room.title, User.name)
+        .join(Recording, RecordingShare.recording_id == Recording.id)
+        .join(Room, Recording.room_id == Room.id)
+        .join(User, RecordingShare.shared_by_user_id == User.id)
+        .where(RecordingShare.shared_with_user_id == current_user.id)
+        .order_by(RecordingShare.created_at.desc())
+    )
+    rows = result.all()
+    return [
+        SharedRecordingResponse(
+            id=share.id,
+            recording_id=recording.id,
+            room_code=room_code,
+            room_title=room_title,
+            mime_type=recording.mime_type,
+            size_bytes=recording.size_bytes,
+            shared_by_name=shared_by_name,
+            shared_at=share.created_at,
+        )
+        for share, recording, room_code, room_title, shared_by_name in rows
+    ]
+
+
 @router.get("/recordings/{recording_id}/file")
 async def download_recording(
     recording_id: int,
@@ -339,8 +435,17 @@ async def download_recording(
     recording = result.scalar_one_or_none()
     if not recording:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found.")
-    if recording.user_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this recording.")
+
+    is_owner_or_admin = recording.user_id == current_user.id or current_user.role == "admin"
+    if not is_owner_or_admin:
+        result = await db.execute(
+            select(RecordingShare).where(
+                RecordingShare.recording_id == recording_id,
+                RecordingShare.shared_with_user_id == current_user.id,
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this recording.")
 
     path = os.path.join(RECORDINGS_DIR, recording.file_path)
     if not os.path.exists(path):

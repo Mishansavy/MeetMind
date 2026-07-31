@@ -12,6 +12,8 @@ import app.models.user  # noqa: F401
 import app.models.meeting  # noqa: F401
 import app.models.task  # noqa: F401
 import app.models.room  # noqa: F401
+import app.models.recording  # noqa: F401
+import app.models.recording_share  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.ASYNC_DATABASE_URL)

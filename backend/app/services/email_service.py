@@ -115,6 +115,28 @@ def send_meeting_invite(
     _send(msg)
 
 
+def send_recording_shared_email(to_email: str, shared_by: str, room_title: Optional[str]) -> None:
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"{shared_by} shared a recording with you"
+    msg["From"] = settings.SMTP_USER
+    msg["To"] = to_email
+
+    recordings_url = f"{settings.FRONTEND_URL}/dashboard/recordings"
+    meeting_line = f"<p><strong>Meeting:</strong> {room_title}</p>" if room_title else ""
+    html = f"""
+    <p>Hi,</p>
+    <p><strong>{shared_by}</strong> shared a meeting recording with you on MeetMind.</p>
+    {meeting_line}
+    <p>
+        <a href="{recordings_url}" style="display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;border-radius:6px;text-decoration:none;">
+            View recording
+        </a>
+    </p>
+    """
+    msg.attach(MIMEText(html, "html"))
+    _send(msg)
+
+
 def send_reminder_email(to_email: str, name: str, task_title: str, deadline: date) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Task due tomorrow: {task_title}"

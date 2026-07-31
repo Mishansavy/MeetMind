@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Film, Play, Download, X } from "lucide-react";
+import { Film, Play, Download, Share2, X } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import { roomsApi } from "../../api/rooms";
 import AdminShell from "../../components/AdminShell";
 import { PageHeader } from "../../components/PageHeader";
 import { EmptyState } from "../../components/EmptyState";
+import { ShareRecordingDialog } from "../../components/ShareRecordingDialog";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
@@ -20,6 +21,7 @@ export default function AdminRecordings() {
     const [recordings, setRecordings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [playback, setPlayback] = useState(null);
+    const [shareTarget, setShareTarget] = useState(null);
 
     useEffect(() => {
         adminApi.getAllRecordings()
@@ -104,6 +106,9 @@ export default function AdminRecordings() {
                                                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => play(r.id)}>
                                                     <Play className="h-3 w-3" /> Play
                                                 </Button>
+                                                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setShareTarget(r)}>
+                                                    <Share2 className="h-3 w-3" /> Share
+                                                </Button>
                                                 <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => download(r)}>
                                                     <Download className="h-3 w-3" /> Download
                                                 </Button>
@@ -127,6 +132,12 @@ export default function AdminRecordings() {
                     </div>
                 </div>
             )}
+
+            <ShareRecordingDialog
+                recording={shareTarget}
+                open={!!shareTarget}
+                onOpenChange={(open) => !open && setShareTarget(null)}
+            />
         </AdminShell>
     );
 }
