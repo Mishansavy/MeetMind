@@ -5,9 +5,14 @@ import {
 } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import AdminShell from "../../components/AdminShell";
+import { PageHeader } from "../../components/PageHeader";
+import { StatCard, MetricGrid } from "../../components/StatCard";
+import { EmptyState } from "../../components/EmptyState";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Skeleton } from "../../components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/table";
 import { cn } from "../../lib/utils";
@@ -19,22 +24,6 @@ import {
     Sheet, SheetContent, SheetHeader, SheetTitle,
     SheetDescription, SheetBody, SheetFooter, SheetClose,
 } from "../../components/ui/sheet";
-
-function StatCard({ label, value, icon: Icon, color }) {
-    return (
-        <Card>
-            <CardContent className="p-5 flex items-center gap-4">
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${color}`}>
-                    <Icon className="h-5 w-5" />
-                </div>
-                <div>
-                    <p className="text-2xl font-bold leading-none">{value}</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
 
 function ConfirmDialog({ open, onOpenChange, title, description, onConfirm }) {
     return (
@@ -83,9 +72,9 @@ function MemberSheet({ member, open, onOpenChange, onApprove, onRemove }) {
             <SheetContent>
                 <SheetHeader>
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                            {member.name?.[0]?.toUpperCase()}
-                        </div>
+                        <Avatar className="h-10 w-10">
+                            <AvatarFallback className="text-sm">{member.name?.[0]?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
                         <div>
                             <SheetTitle>{member.name}</SheetTitle>
                             <SheetDescription>{member.email}</SheetDescription>
@@ -157,6 +146,25 @@ function UrgencyBadge({ score }) {
     return <Badge variant="destructive">High</Badge>;
 }
 
+// Task titles are raw sentence fragments extracted from transcripts, not short labels,
+// so they need truncation with an expand toggle rather than a fixed-height cell.
+function TaskTitleCell({ title, isComplete }) {
+    const [expanded, setExpanded] = useState(false);
+    return (
+        <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={cn(
+                "text-left font-medium max-w-xs",
+                expanded ? "" : "line-clamp-2",
+                isComplete && "line-through text-muted-foreground"
+            )}
+        >
+            {title}
+        </button>
+    );
+}
+
 export default function AdminDashboard() {
     const [pending, setPending] = useState([]);
     const [members, setMembers] = useState([]);
@@ -164,11 +172,14 @@ export default function AdminDashboard() {
     const [confirm, setConfirm] = useState(null);
     const [selectedMember, setSelectedMember] = useState(null);
     const [sheetOpen, setSheetOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     const fetchData = () => {
-        adminApi.getPending().then((r) => setPending(r.data)).catch(() => {});
-        adminApi.getAllUsers().then((r) => setMembers(r.data)).catch(() => {});
-        adminApi.getAllTasks().then((r) => setAllTasks(r.data)).catch(() => {});
+        Promise.all([
+            adminApi.getPending().then((r) => setPending(r.data)).catch(() => {}),
+            adminApi.getAllUsers().then((r) => setMembers(r.data)).catch(() => {}),
+            adminApi.getAllTasks().then((r) => setAllTasks(r.data)).catch(() => {}),
+        ]).finally(() => setLoading(false));
     };
 
     useEffect(() => { fetchData(); }, []);
@@ -188,22 +199,26 @@ export default function AdminDashboard() {
 
     return (
         <AdminShell>
-            <div className="mb-7">
-                <div className="flex items-center gap-2 mb-1">
-                    <LayoutDashboard className="h-5 w-5 text-muted-foreground" />
-                    <h1 className="text-xl font-semibold">Dashboard</h1>
-                </div>
-                <p className="text-sm text-muted-foreground pl-7">
-                    Manage members and review pending approvals.
-                </p>
-            </div>
+            <PageHeader
+                icon={LayoutDashboard}
+                title="Dashboard"
+                description="Manage members and review pending approvals."
+            />
 
             <div className="space-y-6 animate-fade-in">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <StatCard label="Total members" value={members.length} icon={Users} color="bg-blue-50 text-blue-600" />
-                    <StatCard label="Pending approvals" value={pending.length} icon={Clock} color="bg-amber-50 text-amber-600" />
-                    <StatCard label="Active members" value={approved.length} icon={CheckCircle} color="bg-emerald-50 text-emerald-600" />
-                </div>
+                {loading ? (
+                    <MetricGrid>
+                        <Skeleton className="h-[104px]" />
+                        <Skeleton className="h-[104px]" />
+                        <Skeleton className="h-[104px]" />
+                    </MetricGrid>
+                ) : (
+                    <MetricGrid>
+                        <StatCard label="Total members" value={members.length} icon={Users} tone="primary" />
+                        <StatCard label="Pending approvals" value={pending.length} icon={Clock} tone="warning" />
+                        <StatCard label="Active members" value={approved.length} icon={CheckCircle} tone="success" />
+                    </MetricGrid>
+                )}
 
                 <Card>
                     <CardContent className="p-0">
@@ -218,11 +233,11 @@ export default function AdminDashboard() {
                                         <TabsTrigger
                                             key={value}
                                             value={value}
-                                            className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-0 data-[state=active]:border-slate-900 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none text-muted-foreground"
+                                            className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-0 font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:font-semibold data-[state=active]:shadow-none text-muted-foreground"
                                         >
                                             {label}
                                             {count > 0 && (
-                                                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${showCount && count > 0 ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>
+                                                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${showCount && count > 0 ? "bg-warning/10 text-warning" : "bg-primary/10 text-primary"}`}>
                                                     {count}
                                                 </span>
                                             )}
@@ -233,10 +248,11 @@ export default function AdminDashboard() {
 
                             <TabsContent value="pending" className="mt-0">
                                 {pending.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                                        <CheckCircle className="h-8 w-8 opacity-30" />
-                                        <p className="text-sm">No pending approvals</p>
-                                    </div>
+                                    <EmptyState
+                                        icon={CheckCircle}
+                                        title="No pending approvals"
+                                        description="New sign-ups will show up here for review."
+                                    />
                                 ) : (
                                     <Table>
                                         <TableHeader>
@@ -305,9 +321,9 @@ export default function AdminDashboard() {
                                             >
                                                 <TableCell>
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className="h-7 w-7 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                                                            {u.name?.[0]?.toUpperCase()}
-                                                        </div>
+                                                        <Avatar className="h-7 w-7">
+                                                            <AvatarFallback className="text-xs">{u.name?.[0]?.toUpperCase()}</AvatarFallback>
+                                                        </Avatar>
                                                         <span className="font-medium">{u.name}</span>
                                                     </div>
                                                 </TableCell>
@@ -341,10 +357,11 @@ export default function AdminDashboard() {
                             </TabsContent>
                             <TabsContent value="tasks" className="mt-0">
                                 {allTasks.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                                        <CheckSquare className="h-8 w-8 opacity-30" />
-                                        <p className="text-sm">No tasks yet</p>
-                                    </div>
+                                    <EmptyState
+                                        icon={CheckSquare}
+                                        title="No tasks yet"
+                                        description="Tasks extracted from meeting transcripts will appear here."
+                                    />
                                 ) : (
                                     <Table>
                                         <TableHeader>
@@ -362,9 +379,7 @@ export default function AdminDashboard() {
                                             {allTasks.map((task) => (
                                                 <TableRow key={task.id} className={cn(task.is_complete && "opacity-50")}>
                                                     <TableCell>
-                                                        <span className={cn("font-medium", task.is_complete && "line-through text-muted-foreground")}>
-                                                            {task.title}
-                                                        </span>
+                                                        <TaskTitleCell title={task.title} isComplete={task.is_complete} />
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">{task.user_name}</TableCell>
                                                     <TableCell className="text-muted-foreground">

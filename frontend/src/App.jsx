@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -11,14 +12,17 @@ import UserDashboard from "./pages/user/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminEmployees from "./pages/admin/Employees";
 import AdminAttendance from "./pages/admin/Attendance";
+import AdminRecordings from "./pages/admin/Recordings";
 import MeetingNotes from "./pages/user/MeetingNotes";
 import Tasks from "./pages/user/Tasks";
 import Analytics from "./pages/user/Analytics";
 import JoinMeeting from "./pages/user/JoinMeeting";
 import MeetingRoom from "./pages/user/MeetingRoom";
+import Recordings from "./pages/user/Recordings";
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
@@ -79,6 +83,14 @@ export default function App() {
             }
           />
           <Route
+            path="/dashboard/recordings"
+            element={
+              <ProtectedRoute requiredRole="user">
+                <Recordings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin"
             element={
               <ProtectedRoute requiredRole="admin">
@@ -102,8 +114,17 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/recordings"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminRecordings />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

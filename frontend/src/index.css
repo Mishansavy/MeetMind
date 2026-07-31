@@ -6,29 +6,71 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 220 20% 97%;
     --foreground: 224 71% 4%;
 
     --card: 0 0% 100%;
     --card-foreground: 224 71% 4%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 221 83% 53%;
+    --border: 250 20% 91%;
+    --input: 250 20% 91%;
+    --ring: 262 83% 58%;
 
-    --primary: 221 83% 53%;
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 250 20% 96%;
+    --muted-foreground: 250 10% 46%;
 
-    --accent: 220 14% 96%;
+    --accent: 250 20% 96%;
     --accent-foreground: 224 71% 4%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    --success: 152 69% 31%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 100%;
+
+    --sidebar-from: 260 65% 18%;
+    --sidebar-to: 262 70% 46%;
+
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 224 28% 8%;
+    --foreground: 220 20% 94%;
+
+    --card: 224 24% 11%;
+    --card-foreground: 220 20% 94%;
+
+    --border: 260 18% 18%;
+    --input: 260 18% 18%;
+    --ring: 263 91% 70%;
+
+    --primary: 263 91% 70%;
+    --primary-foreground: 260 30% 10%;
+
+    --muted: 260 18% 15%;
+    --muted-foreground: 250 12% 65%;
+
+    --accent: 260 18% 16%;
+    --accent-foreground: 220 20% 94%;
+
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 45%;
+    --success-foreground: 224 28% 8%;
+
+    --warning: 38 92% 58%;
+    --warning-foreground: 224 28% 8%;
+
+    --sidebar-from: 260 60% 10%;
+    --sidebar-to: 262 65% 30%;
   }
 
   * {
@@ -43,5 +85,9 @@
     -moz-osx-font-smoothing: grayscale;
     font-size: 14px;
     line-height: 1.6;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.2);
   }
 }

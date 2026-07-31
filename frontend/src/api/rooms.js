@@ -11,5 +11,6 @@ export const roomsApi = {
         headers: { "Content-Type": "multipart/form-data" },
     }),
     listRecordings: (code) => api.get(`/rooms/${code}/recordings`),
+    myRecordings: () => api.get("/rooms/recordings/mine"),
     downloadRecording: (id) => api.get(`/rooms/recordings/${id}/file`, { responseType: "blob" }),
 };

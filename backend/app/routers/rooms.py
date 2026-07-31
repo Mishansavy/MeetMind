@@ -77,6 +77,18 @@ class RecordingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MyRecordingResponse(BaseModel):
+    id: int
+    room_id: int
+    room_code: str
+    room_title: Optional[str] = None
+    mime_type: str
+    size_bytes: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 def _parse_deadline(raw: str | None) -> date | None:
     """Try to parse a free-form date string from NER into a date object.
     Returns None if the string is absent or unparseable rather than raising."""
@@ -291,6 +303,32 @@ async def list_recordings(
     return result.scalars().all()
 
 
+@router.get("/recordings/mine", response_model=list[MyRecordingResponse])
+async def list_my_recordings(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Recording, Room.room_code, Room.title)
+        .join(Room, Recording.room_id == Room.id)
+        .where(Recording.user_id == current_user.id)
+        .order_by(Recording.created_at.desc())
+    )
+    rows = result.all()
+    return [
+        MyRecordingResponse(
+            id=recording.id,
+            room_id=recording.room_id,
+            room_code=room_code,
+            room_title=room_title,
+            mime_type=recording.mime_type,
+            size_bytes=recording.size_bytes,
+            created_at=recording.created_at,
+        )
+        for recording, room_code, room_title in rows
+    ]
+
+
 @router.get("/recordings/{recording_id}/file")
 async def download_recording(
     recording_id: int,
@@ -301,6 +339,8 @@ async def download_recording(
     recording = result.scalar_one_or_none()
     if not recording:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found.")
+    if recording.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this recording.")
 
     path = os.path.join(RECORDINGS_DIR, recording.file_path)
     if not os.path.exists(path):

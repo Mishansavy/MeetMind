@@ -9,7 +9,7 @@ export function Table({ className, ...props }) {
 }
 
 export function TableHeader({ className, ...props }) {
-    return <thead className={cn("[&_tr]:border-b", className)} {...props} />;
+    return <thead className={cn("bg-muted/40 [&_tr]:border-b", className)} {...props} />;
 }
 
 export function TableBody({ className, ...props }) {
@@ -19,7 +19,7 @@ export function TableBody({ className, ...props }) {
 export function TableRow({ className, ...props }) {
     return (
         <tr
-            className={cn("border-b border-border transition-colors hover:bg-muted/40 data-[state=selected]:bg-muted", className)}
+            className={cn("border-b border-border transition-colors duration-150 hover:bg-primary/[0.03] data-[state=selected]:bg-muted", className)}
             {...props}
         />
     );
@@ -29,7 +29,7 @@ export function TableHead({ className, ...props }) {
     return (
         <th
             className={cn(
-                "h-9 px-4 text-left align-middle text-xs font-medium text-muted-foreground uppercase tracking-wide",
+                "h-12 px-5 text-left align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
                 "[&:has([role=checkbox])]:pr-0",
                 className
             )}
@@ -41,7 +41,7 @@ export function TableHead({ className, ...props }) {
 export function TableCell({ className, ...props }) {
     return (
         <td
-            className={cn("px-4 py-3 align-middle [&:has([role=checkbox])]:pr-0", className)}
+            className={cn("px-5 py-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
             {...props}
         />
     );

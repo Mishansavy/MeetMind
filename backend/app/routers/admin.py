@@ -7,11 +7,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_admin
+from app.models.recording import Recording
+from app.models.room import Room
 from app.models.task import Task, TaskPriority
 from app.models.user import User
 from app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+class AdminRecordingResponse(BaseModel):
+    id: int
+    room_id: int
+    room_code: str
+    room_title: Optional[str]
+    user_id: int
+    user_name: str
+    mime_type: str
+    size_bytes: int
+    created_at: str
+
+    model_config = {"from_attributes": True}
 
 
 class AdminTaskResponse(BaseModel):
@@ -86,6 +102,34 @@ async def remove_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     user.is_active = False
     await db.commit()
+
+
+@router.get("/recordings", response_model=List[AdminRecordingResponse])
+async def list_all_recordings(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    result = await db.execute(
+        select(Recording, Room.room_code, Room.title, User.name)
+        .join(Room, Recording.room_id == Room.id)
+        .join(User, Recording.user_id == User.id)
+        .order_by(Recording.created_at.desc())
+    )
+    rows = result.all()
+    return [
+        AdminRecordingResponse(
+            id=recording.id,
+            room_id=recording.room_id,
+            room_code=room_code,
+            room_title=room_title,
+            user_id=recording.user_id,
+            user_name=user_name,
+            mime_type=recording.mime_type,
+            size_bytes=recording.size_bytes,
+            created_at=recording.created_at.isoformat(),
+        )
+        for recording, room_code, room_title, user_name in rows
+    ]
 
 
 @router.get("/tasks", response_model=List[AdminTaskResponse])

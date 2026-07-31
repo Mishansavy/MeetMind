@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
-import { Briefcase, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
+import { Briefcase, Pencil, Plus, Trash2, UserCheck, Users } from "lucide-react";
 import { adminApi } from "../../api/admin";
 import { employeesApi } from "../../api/employees";
 import AdminShell from "../../components/AdminShell";
+import { PageHeader } from "../../components/PageHeader";
+import { EmptyState } from "../../components/EmptyState";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Skeleton } from "../../components/ui/skeleton";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/table";
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
@@ -149,9 +153,9 @@ function EditEmployeeSheet({ employee, open, onOpenChange, onSaved, onApprove, o
             <SheetContent>
                 <SheetHeader>
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                            {employee.name?.[0]?.toUpperCase()}
-                        </div>
+                        <Avatar className="h-10 w-10">
+                            <AvatarFallback className="text-sm">{employee.name?.[0]?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
                         <div>
                             <SheetTitle>{employee.name}</SheetTitle>
                             <SheetDescription>{employee.email}</SheetDescription>
@@ -225,9 +229,10 @@ export default function AdminEmployees() {
     const [sheetOpen, setSheetOpen] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
     const [confirm, setConfirm] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const fetchData = () =>
-        adminApi.getAllUsers().then((r) => setEmployees(r.data)).catch(() => {});
+        adminApi.getAllUsers().then((r) => setEmployees(r.data)).catch(() => {}).finally(() => setLoading(false));
 
     useEffect(() => { fetchData(); }, []);
 
@@ -236,85 +241,108 @@ export default function AdminEmployees() {
 
     return (
         <AdminShell>
-            <div className="mb-7 flex items-end justify-between">
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <Briefcase className="h-5 w-5 text-muted-foreground" />
-                        <h1 className="text-xl font-semibold">Employees</h1>
-                    </div>
-                    <p className="text-sm text-muted-foreground pl-7">
-                        {employees.length} total · {employees.filter((e) => e.is_approved).length} active
-                    </p>
-                </div>
-                <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-                    <Plus className="h-3.5 w-3.5" /> Add employee
-                </Button>
-            </div>
+            <PageHeader
+                icon={Briefcase}
+                title="Employees"
+                description={`${employees.length} total · ${employees.filter((e) => e.is_approved).length} active`}
+                actions={
+                    <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
+                        <Plus className="h-3.5 w-3.5" /> Add employee
+                    </Button>
+                }
+            />
 
-            <Card>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Role</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Department</TableHead>
-                                <TableHead>Designation</TableHead>
-                                <TableHead />
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {employees.map((e) => (
-                                <TableRow key={e.id} className="cursor-pointer" onClick={() => { setSelected(e); setSheetOpen(true); }}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="h-7 w-7 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-                                                {e.name?.[0]?.toUpperCase()}
+            <Card className="relative overflow-hidden">
+                <div
+                    className="pointer-events-none absolute right-0 top-0 h-32 w-32 opacity-[0.3]"
+                    style={{
+                        backgroundImage: "radial-gradient(circle, hsl(var(--border)) 1.5px, transparent 1.5px)",
+                        backgroundSize: "10px 10px",
+                        maskImage: "radial-gradient(circle at top right, black, transparent 70%)",
+                    }}
+                />
+                <CardContent className="relative p-0">
+                    {loading ? (
+                        <div className="space-y-3 p-6">
+                            <Skeleton className="h-12 w-full" />
+                            <Skeleton className="h-12 w-full" />
+                            <Skeleton className="h-12 w-full" />
+                        </div>
+                    ) : employees.length === 0 ? (
+                        <EmptyState
+                            icon={Users}
+                            title="No employees yet"
+                            description="Add your first employee to start managing your team."
+                            action={
+                                <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
+                                    <Plus className="h-3.5 w-3.5" /> Add employee
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Department</TableHead>
+                                    <TableHead>Designation</TableHead>
+                                    <TableHead />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {employees.map((e) => (
+                                    <TableRow key={e.id} className="group cursor-pointer" onClick={() => { setSelected(e); setSheetOpen(true); }}>
+                                        <TableCell>
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-9 w-9 shadow-sm ring-2 ring-background">
+                                                    <AvatarFallback className="text-xs">{e.name?.[0]?.toUpperCase()}</AvatarFallback>
+                                                </Avatar>
+                                                <span className="font-medium">{e.name}</span>
                                             </div>
-                                            <span className="font-medium">{e.name}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">{e.email}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={e.role === "admin" ? "default" : "secondary"}>{e.role}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={e.is_approved ? "success" : "warning"}>
-                                            {e.is_approved ? "Active" : "Pending"}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {e.department ? <Badge variant="secondary">{e.department}</Badge> : <span className="text-muted-foreground">-</span>}
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">{e.designation || "-"}</TableCell>
-                                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
-                                        <div className="flex items-center justify-end gap-1">
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-8 w-8 text-muted-foreground"
-                                                onClick={() => { setSelected(e); setSheetOpen(true); }}
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            {e.role !== "admin" && (
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground">{e.email}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={e.role === "admin" ? "default" : "secondary"} className="capitalize">{e.role}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={e.is_approved ? "success" : "warning"}>
+                                                {e.is_approved ? "Active" : "Pending"}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {e.department ? <Badge variant="secondary">{e.department}</Badge> : <span className="text-muted-foreground/50">-</span>}
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground">{e.designation || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                                        <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
+                                            <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
-                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                    onClick={() => setConfirm({ id: e.id, name: e.name })}
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                    onClick={() => { setSelected(e); setSheetOpen(true); }}
                                                 >
-                                                    <Trash2 className="h-4 w-4" />
+                                                    <Pencil className="h-4 w-4" />
                                                 </Button>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                                                {e.role !== "admin" && (
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                        onClick={() => setConfirm({ id: e.id, name: e.name })}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
                 </CardContent>
             </Card>
 

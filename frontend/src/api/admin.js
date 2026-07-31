@@ -6,4 +6,5 @@ export const adminApi = {
   approveUser: (id) => api.post(`/admin/users/${id}/approve`),
   removeUser: (id) => api.delete(`/admin/users/${id}`),
   getAllTasks: () => api.get("/admin/tasks"),
+  getAllRecordings: () => api.get("/admin/recordings"),
 };
