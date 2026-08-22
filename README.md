@@ -208,3 +208,6 @@ You may use, study, modify, and redistribute this code. If you run a modified ve
 PDF text extraction uses PyMuPDF, which is itself AGPL-3.0 unless you hold an Artifex commercial license.
 
 For use under different terms, contact the copyright holder.
+
+Contributions require agreeing to the [CLA](CLA.md), which is what keeps that
+dual-licensing option open. See [CONTRIBUTING.md](CONTRIBUTING.md).
