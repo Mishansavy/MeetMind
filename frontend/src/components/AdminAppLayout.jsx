@@ -9,6 +9,7 @@ import {
     DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from "./ui/dropdown-menu";
 import { cn } from "../lib/utils";
+import { SourceLink } from "./SourceLink";
 
 function NavItem({ to, icon: Icon, label, exact, onClick }) {
     return (
@@ -104,6 +105,7 @@ export default function AdminAppLayout({ nav, brand, subtitle, children }) {
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+                <SourceLink className="mt-1 text-white/65 hover:text-white" />
             </div>
         </div>
     );
