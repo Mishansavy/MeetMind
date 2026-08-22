@@ -194,3 +194,17 @@ Browsers only grant camera and microphone access on `localhost` or over HTTPS, s
 - Recordings are written to `backend/uploads/recordings/`, which is not tracked by git. Nothing prunes that directory.
 - WebSocket signaling is per-process, so running more than one worker breaks live meetings. Multi-server would need a shared pub/sub backend.
 - Each participant records their own camera locally, so a meeting produces one file per participant rather than a single composited video.
+
+---
+
+## License
+
+Copyright (C) 2026 Mishan Shah.
+
+Licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE) for the full text.
+
+You may use, study, modify, and redistribute this code. If you run a modified version as a network service, section 13 requires you to offer your users the source of that version.
+
+PDF text extraction uses PyMuPDF, which is itself AGPL-3.0 unless you hold an Artifex commercial license.
+
+For use under different terms, contact the copyright holder.
