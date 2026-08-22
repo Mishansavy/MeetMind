@@ -198,7 +198,6 @@ export default function AdminDashboard() {
                                 <TabsList className="bg-transparent p-0 h-auto gap-0 rounded-none w-auto">
                                     {[
                                         { value: "pending", label: "Pending", count: pending.length, showCount: true },
-                                        { value: "members", label: "All Members", count: members.length, showCount: false },
                                         { value: "tasks", label: "Meeting Tasks", count: allTasks.length, showCount: false },
                                     ].map(({ value, label, count, showCount }) => (
                                         <TabsTrigger
@@ -272,60 +271,6 @@ export default function AdminDashboard() {
                                 )}
                             </TabsContent>
 
-                            <TabsContent value="members" className="mt-0">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Email</TableHead>
-                                            <TableHead>Role</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead />
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {members.map((u) => (
-                                            <TableRow
-                                                key={u.id}
-                                                className="cursor-pointer"
-                                                onClick={() => openDetail(u)}
-                                            >
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2.5">
-                                                        <Avatar className="h-7 w-7">
-                                                            <AvatarFallback className="text-xs">{u.name?.[0]?.toUpperCase()}</AvatarFallback>
-                                                        </Avatar>
-                                                        <span className="font-medium">{u.name}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                                                        {u.role}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={u.is_approved ? "success" : "warning"}>
-                                                        {u.is_approved ? "Active" : "Pending"}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                    {u.role !== "admin" && (
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                            onClick={() => setConfirm({ id: u.id, name: u.name, action: "remove" })}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TabsContent>
                             <TabsContent value="tasks" className="mt-0">
                                 {allTasks.length === 0 ? (
                                     <EmptyState
