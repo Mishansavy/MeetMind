@@ -24,8 +24,7 @@ def create_access_token(subject: str) -> str:
 
 def create_email_verification_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)
-    # The "type" claim prevents this token from being accepted by other endpoints
-    # (e.g. password reset). Each token type is only valid for its own flow.
+    # "type" scopes the token to this flow only
     payload = {"sub": email, "type": "email_verify", "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -46,6 +45,5 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
-        # Treat any decode failure (expired, tampered, wrong key) uniformly, callers
-        # check for an empty dict and raise the appropriate HTTP error themselves.
+        # expired, tampered, wrong key: all look the same to callers
         return {}

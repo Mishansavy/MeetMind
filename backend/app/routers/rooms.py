@@ -30,13 +30,10 @@ from app.utils.security import decode_token
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
-# Local disk storage for meeting recordings, alongside the app rather than in a temp dir
-# since these need to persist after the request completes.
+# on disk, not tempfile: these outlive the request
 RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads", "recordings")
 
-# In-process signaling hub: room_code → set of connected WebSocket connections.
-# Scoped to this process, not shared across workers, which is fine for a single-server
-# deployment. Multi-server would need a Redis pub/sub backend instead.
+# room_code -> live sockets. Per-process, so a multi-server deploy needs Redis pub/sub.
 _hub: dict[str, set[WebSocket]] = {}
 
 
@@ -108,8 +105,7 @@ class SharedRecordingResponse(BaseModel):
 
 
 def _parse_deadline(raw: str | None) -> date | None:
-    """Try to parse a free-form date string from NER into a date object.
-    Returns None if the string is absent or unparseable rather than raising."""
+    """Parse a free-form NER date string, None if absent or unparseable."""
     if not raw:
         return None
     try:
@@ -190,15 +186,10 @@ async def transcribe_room(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Accept a WebM/WAV audio blob, run Whisper, and auto-create a note + tasks.
+    """Transcribe an audio blob with Whisper, then create a note and its tasks.
 
-    The audio is written to a temp file because Whisper's Python API expects a
-    file path, not a bytes buffer. The temp file is deleted in the finally block
-    regardless of whether transcription succeeds.
-
-    Accepts inactive rooms -- transcription is often triggered right as the last
-    peer disconnects, so requiring is_active=True would cause spurious 404s.
-    """
+    Inactive rooms are allowed: transcription usually fires as the last peer
+    disconnects, so requiring is_active would 404 on the common case."""
     result = await db.execute(select(Room).where(Room.room_code == code))
     room = result.scalar_one_or_none()
     if not room:
@@ -229,7 +220,7 @@ async def transcribe_room(
     meeting_label = room.started_at.strftime("%b %d, %Y %H:%M") if room.started_at else now.strftime("%b %d, %Y %H:%M")
     note = MeetingNote(
         user_id=current_user.id,
-        title=f"Meeting {code} -- {meeting_label}",
+        title=f"Meeting {code}, {meeting_label}",
         content=text,
         source=NoteSource.transcript,
     )
@@ -269,12 +260,10 @@ async def upload_recording(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Store a participant's self-view video+audio recording for a meeting.
+    """Store one participant's self-view recording.
 
-    Mesh P2P has no server-side stream mixing, so each participant records their
-    own camera/mic locally and uploads it here -- a meeting ends up with one
-    recording per participant rather than a single composited video.
-    """
+    Mesh P2P does no server-side mixing, so a meeting yields one recording per
+    participant rather than a single composited video."""
     result = await db.execute(select(Room).where(Room.room_code == code))
     room = result.scalar_one_or_none()
     if not room:
@@ -461,16 +450,10 @@ async def room_ws(
     token: Optional[str] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """WebSocket signaling channel for WebRTC peer negotiation.
+    """Signaling channel for WebRTC peer negotiation.
 
-    Auth is via a ?token= query param instead of an Authorization header because
-    the browser WebSocket API does not support custom headers, only query params
-    and cookies are available at connection time.
-
-    The hub forwards all messages to every other peer in the room. Peers use these
-    forwarded messages to exchange PeerJS peer IDs, then negotiate WebRTC directly
-    without further server involvement.
-    """
+    Auth goes in ?token= because the browser WebSocket API can't send headers.
+    The hub only relays peer IDs; media is negotiated directly between peers."""
     payload = decode_token(token) if token else None
     if not payload:
         await websocket.close(code=4001)
@@ -494,15 +477,13 @@ async def room_ws(
     peers = _hub.setdefault(code, set())
     peers.add(websocket)
 
-    # Record the meeting start time when the first peer connects.
-    # Re-fetch room inside the WS handler because the db session from the route
-    # dependency is a fresh session, not shared with the REST routes.
+    # re-fetch: the WS route gets its own session, not the one REST routes used
     ws_room_result = await db.execute(select(Room).where(Room.room_code == code))
     ws_room = ws_room_result.scalar_one_or_none()
     if ws_room:
         if ws_room.started_at is None:
             ws_room.started_at = datetime.now(timezone.utc)
-        # Track the peak number of simultaneous participants.
+        # peak concurrent participants
         if len(peers) > ws_room.participant_count:
             ws_room.participant_count = len(peers)
         await db.commit()
@@ -535,6 +516,6 @@ async def _broadcast(code: str, payload: dict, exclude: Optional[WebSocket] = No
         try:
             await ws.send_text(json.dumps(payload))
         except Exception:
-            # Socket died mid-send, collect and remove after iteration.
+            # died mid-send, reap after the loop
             dead.add(ws)
     peers -= dead

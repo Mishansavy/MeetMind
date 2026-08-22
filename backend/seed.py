@@ -1,11 +1,4 @@
-"""
-Seed script, run once to populate initial data.
-
-Usage:
-    python seed.py
-
-Creates the admin user if it doesn't already exist.
-"""
+"""Create the admin user if it does not exist. Safe to re-run."""
 import asyncio
 from sqlalchemy import select
 from app.database import AsyncSessionLocal

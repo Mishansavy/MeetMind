@@ -24,7 +24,7 @@ async def create_employee(
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered.")
 
-    # random unusable password until the employee sets their own via the invite link
+    # unusable password until they set one via the invite link
     user = User(
         name=payload.name,
         email=payload.email,

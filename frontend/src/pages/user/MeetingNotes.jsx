@@ -103,7 +103,7 @@ function ExtractDialog({ note, open, onOpenChange, onSaved }) {
                 </DialogHeader>
 
                 {loading && (
-                    <div className="py-8 text-center text-sm text-muted-foreground">Scanning for action items…</div>
+                    <div className="py-8 text-center text-sm text-muted-foreground">Scanning for action items...</div>
                 )}
 
                 {!loading && error && <p className="text-sm text-destructive">{error}</p>}
@@ -154,7 +154,7 @@ function ExtractDialog({ note, open, onOpenChange, onSaved }) {
                     </DialogClose>
                     {previews.length > 0 && (
                         <Button size="sm" disabled={saving || selected.size === 0} onClick={handleSave}>
-                            {saving ? "Saving…" : `Save ${selected.size} task${selected.size !== 1 ? "s" : ""}`}
+                            {saving ? "Saving..." : `Save ${selected.size} task${selected.size !== 1 ? "s" : ""}`}
                         </Button>
                     )}
                 </div>
@@ -287,7 +287,7 @@ function NewNoteDialog({ open, onOpenChange, onCreated }) {
                             <textarea
                                 id="note-content"
                                 rows={8}
-                                placeholder="Paste your meeting notes here…"
+                                placeholder="Paste your meeting notes here..."
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
                                 required
@@ -321,7 +321,7 @@ function NewNoteDialog({ open, onOpenChange, onCreated }) {
                             <Button type="button" variant="outline" size="sm">Cancel</Button>
                         </DialogClose>
                         <Button type="submit" size="sm" disabled={loading}>
-                            {loading ? "Saving…" : "Save note"}
+                            {loading ? "Saving..." : "Save note"}
                         </Button>
                     </div>
                 </form>

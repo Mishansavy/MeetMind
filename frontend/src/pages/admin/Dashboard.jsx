@@ -140,14 +140,13 @@ function MemberSheet({ member, open, onOpenChange, onApprove, onRemove }) {
 const PRIORITY_VARIANT = { low: "secondary", medium: "warning", high: "destructive" };
 
 function UrgencyBadge({ score }) {
-    if (score == null) return <span className="text-muted-foreground/40">--</span>;
+    if (score == null) return <span className="text-muted-foreground/40">-</span>;
     if (score < 0.1) return <Badge variant="success">Low</Badge>;
     if (score < 0.3) return <Badge variant="warning">Med</Badge>;
     return <Badge variant="destructive">High</Badge>;
 }
 
-// Task titles are raw sentence fragments extracted from transcripts, not short labels,
-// so they need truncation with an expand toggle rather than a fixed-height cell.
+// transcript-extracted titles are full sentences, so truncate with an expand toggle
 function TaskTitleCell({ title, isComplete }) {
     const [expanded, setExpanded] = useState(false);
     return (
@@ -383,12 +382,12 @@ export default function AdminDashboard() {
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">{task.user_name}</TableCell>
                                                     <TableCell className="text-muted-foreground">
-                                                        {task.assignee_name || <span className="text-muted-foreground/40">--</span>}
+                                                        {task.assignee_name || <span className="text-muted-foreground/40">-</span>}
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
                                                         {task.deadline
                                                             ? new Date(task.deadline + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                                                            : <span className="text-muted-foreground/40">--</span>}
+                                                            : <span className="text-muted-foreground/40">-</span>}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge variant={PRIORITY_VARIANT[task.priority]} className="capitalize">

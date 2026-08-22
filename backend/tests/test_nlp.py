@@ -1,4 +1,4 @@
-"""Tests for nlp_service, pure functions, no DB or network required."""
+"""Tests for nlp_service. Pure functions, no DB or network."""
 
 from datetime import date, timedelta
 

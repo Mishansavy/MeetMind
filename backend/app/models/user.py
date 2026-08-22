@@ -27,7 +27,7 @@ class User(Base):
     otp_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     otp_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Office/HR fields
+    # HR fields
     employee_id: Mapped[Optional[str]] = mapped_column(String(50), unique=True, nullable=True)
     department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     designation: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

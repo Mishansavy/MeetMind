@@ -124,7 +124,7 @@ export default function Login() {
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {loading ? "Signing in…" : "Sign in"}
+                  {loading ? "Signing in..." : "Sign in"}
                 </Button>
                 <button type="button" onClick={() => switchMode("otp-email")}
                   className="w-full text-sm text-primary hover:underline text-center mt-1">
@@ -143,7 +143,7 @@ export default function Login() {
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {loading ? "Sending…" : "Send code"}
+                  {loading ? "Sending..." : "Send code"}
                 </Button>
                 <button type="button" onClick={() => switchMode("password")}
                   className="w-full text-sm text-muted-foreground hover:underline text-center">
@@ -162,7 +162,7 @@ export default function Login() {
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {loading ? "Verifying…" : "Verify & sign in"}
+                  {loading ? "Verifying..." : "Verify & sign in"}
                 </Button>
                 <button type="button" onClick={() => switchMode("otp-email")}
                   className="w-full text-sm text-muted-foreground hover:underline text-center">

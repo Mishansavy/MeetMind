@@ -1,4 +1,4 @@
-"""Integration tests for authentication endpoints, hits real Postgres."""
+"""Integration tests for the auth endpoints, against real Postgres."""
 
 from unittest.mock import patch
 
@@ -9,7 +9,7 @@ from app.models.user import User, UserRole
 from app.utils.security import hash_password, create_access_token
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# Helpers
 
 async def make_user(db_session, email="test@example.com", password="password123",
                     verified=True, approved=True, role=UserRole.user):
@@ -32,7 +32,7 @@ def auth_headers(user_id: int) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-# ── Registration ──────────────────────────────────────────────────────────────
+# Registration
 
 class TestRegister:
     @pytest.mark.asyncio
@@ -60,7 +60,7 @@ class TestRegister:
         assert resp.status_code == 422
 
 
-# ── Login ─────────────────────────────────────────────────────────────────────
+# Login
 
 class TestLogin:
     @pytest.mark.asyncio
@@ -97,7 +97,7 @@ class TestLogin:
         assert resp.status_code == 403
 
 
-# ── /auth/me ──────────────────────────────────────────────────────────────────
+# /auth/me
 
 class TestMe:
     @pytest.mark.asyncio
@@ -113,7 +113,7 @@ class TestMe:
         assert resp.status_code in (401, 403)
 
 
-# ── OTP ───────────────────────────────────────────────────────────────────────
+# OTP
 
 class TestOtp:
     @pytest.mark.asyncio
@@ -135,7 +135,7 @@ class TestOtp:
         assert resp.status_code == 401
 
 
-# ── Forgot / Reset Password ───────────────────────────────────────────────────
+# Forgot / Reset Password
 
 class TestForgotReset:
     @pytest.mark.asyncio

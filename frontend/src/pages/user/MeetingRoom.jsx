@@ -9,7 +9,7 @@ import { cn } from "../../lib/utils";
 
 const WS_BASE = import.meta.env.VITE_WS_URL || "ws://localhost:8000/api/v1";
 
-// cap resolution/fps so we don't always grab max camera quality
+// cap resolution and fps rather than grabbing max camera quality
 const MEDIA_CONSTRAINTS = {
     video: { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { max: 30 } },
     audio: true,
@@ -18,7 +18,7 @@ const MEDIA_CONSTRAINTS = {
 const BITRATE_STEPS = [150_000, 300_000, 600_000, 1_200_000, 2_500_000];
 const STATS_INTERVAL_MS = 4000;
 
-// steps a peer connection's outbound video bitrate up/down based on loss + achieved throughput
+// steps outbound video bitrate on packet loss and achieved throughput
 function startBitrateController(peerConnection) {
     let stepIndex = BITRATE_STEPS.length - 1;
     let lastBytesSent = null;
@@ -112,7 +112,6 @@ function VideoTile({ stream, label, muted = false }) {
     );
 }
 
-// Status pill shown in top bar during recording / transcribing
 function StatusPill({ recording, transcribing }) {
     if (transcribing) {
         return (
@@ -182,7 +181,7 @@ export default function MeetingRoom() {
         });
     }, []);
 
-    // ── Caption helpers ───────────────────────────────────────────────────────
+    // Caption helpers
     const addCaption = useCallback((id, speaker, text) => {
         setCaptions((prev) => {
             const filtered = prev.filter((c) => c.id !== id);
@@ -226,7 +225,7 @@ export default function MeetingRoom() {
         captionsOn ? stopCaptions() : startCaptions();
     }, [captionsOn, startCaptions, stopCaptions]);
 
-    // ── WebRTC setup ──────────────────────────────────────────────────────────
+    // WebRTC setup
     useEffect(() => {
         if (!code || !user) return;
         let cancelled = false;
@@ -320,7 +319,7 @@ export default function MeetingRoom() {
         };
     }, [code, user, addPeer, removePeer, addCaption]);
 
-    // ── Controls ──────────────────────────────────────────────────────────────
+    // Controls
     const toggleAudio = () => {
         localStreamRef.current?.getAudioTracks().forEach((t) => { t.enabled = !t.enabled; });
         setAudioOn((v) => !v);
@@ -346,7 +345,7 @@ export default function MeetingRoom() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // ── Recording / transcription ─────────────────────────────────────────────
+    // Recording / transcription
     const startRecording = () => {
         if (!localStreamRef.current) {
             setError("No audio stream available to record.");
@@ -360,7 +359,7 @@ export default function MeetingRoom() {
             return;
         }
 
-        // Record audio-only to avoid codec issues with mixed video+audio streams.
+        // audio-only: mixed video+audio streams hit codec issues
         const audioStream = new MediaStream(audioTracks);
 
         const supportedMime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]
@@ -380,7 +379,7 @@ export default function MeetingRoom() {
         recorderRef.current = recorder;
         setRecording(true);
 
-        // separate recorder captures self-view video+audio for the meeting recording feature
+        // second recorder captures self-view video for the recordings feature
         videoChunksRef.current = [];
         const videoMime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
             .find((m) => MediaRecorder.isTypeSupported(m));
@@ -392,7 +391,7 @@ export default function MeetingRoom() {
             videoRecorder.start(1000);
             videoRecorderRef.current = videoRecorder;
         } catch {
-            // video recording is best-effort -- transcription still works without it
+            // best effort, transcription works without it
         }
     };
 
@@ -409,7 +408,7 @@ export default function MeetingRoom() {
                 await roomsApi.uploadRecording(code, form);
                 loadRecordings();
             } catch {
-                // best-effort -- transcript/notes flow already succeeded independently
+                // best effort, the transcript flow already succeeded
             }
         };
         recorder.stop();
@@ -438,7 +437,7 @@ export default function MeetingRoom() {
 
         uploadVideoRecording();
 
-        // onstop must be wired before .stop(), some browsers fire it synchronously.
+        // wire onstop before stop(): some browsers fire it synchronously
         recorder.onstop = async () => {
             setRecording(false);
             setTranscribing(true);
@@ -472,7 +471,6 @@ export default function MeetingRoom() {
 
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col relative">
-            {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
                 <span className="text-sm font-semibold text-white">MeetMind</span>
 
@@ -532,7 +530,6 @@ export default function MeetingRoom() {
                 </div>
             )}
 
-            {/* Video grid */}
             <div className="flex-1 p-4 overflow-auto relative">
                 {error ? (
                     <div className="flex items-center justify-center h-full">
@@ -556,7 +553,6 @@ export default function MeetingRoom() {
                             ))}
                         </div>
 
-                        {/* Live captions overlay */}
                         {captions.length > 0 && (
                             <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-1 items-center pointer-events-none">
                                 {captions.map(({ id, speaker, text }) => (
@@ -568,12 +564,11 @@ export default function MeetingRoom() {
                             </div>
                         )}
 
-                        {/* Transcribing full-screen overlay */}
                         {transcribing && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-xl">
                                 <div className="flex flex-col items-center gap-3 text-white">
                                     <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
-                                    <p className="text-sm font-medium">Transcribing your meeting…</p>
+                                    <p className="text-sm font-medium">Transcribing your meeting...</p>
                                     <p className="text-xs text-slate-400">Extracting tasks and saving notes</p>
                                 </div>
                             </div>
@@ -582,10 +577,8 @@ export default function MeetingRoom() {
                 )}
             </div>
 
-            {/* Controls */}
             <div className="flex flex-col items-center gap-3 py-4 border-t border-slate-800">
                 <div className="flex items-center gap-3">
-                    {/* Mic */}
                     <ControlButton
                         onClick={toggleAudio}
                         active={audioOn}
@@ -594,7 +587,6 @@ export default function MeetingRoom() {
                         {audioOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
                     </ControlButton>
 
-                    {/* Camera */}
                     <ControlButton
                         onClick={toggleVideo}
                         active={videoOn}
@@ -603,7 +595,6 @@ export default function MeetingRoom() {
                         {videoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
                     </ControlButton>
 
-                    {/* Captions */}
                     <ControlButton
                         onClick={toggleCaptions}
                         active={captionsOn}
@@ -613,7 +604,6 @@ export default function MeetingRoom() {
                         {captionsOn ? <Captions className="h-5 w-5" /> : <CaptionsOff className="h-5 w-5" />}
                     </ControlButton>
 
-                    {/* Record / Stop */}
                     <ControlButton
                         onClick={recording ? stopAndTranscribe : startRecording}
                         disabled={transcribing}
@@ -627,7 +617,6 @@ export default function MeetingRoom() {
                         }
                     </ControlButton>
 
-                    {/* Leave */}
                     <button
                         onClick={handleLeave}
                         title="Leave meeting"
@@ -637,7 +626,6 @@ export default function MeetingRoom() {
                     </button>
                 </div>
 
-                {/* Hint text under controls */}
                 <p className="text-xs text-slate-500 h-4">
                     {recording && "Speaking? Your audio is being recorded."}
                     {!recording && !transcribing && "Click the record button to capture the meeting."}

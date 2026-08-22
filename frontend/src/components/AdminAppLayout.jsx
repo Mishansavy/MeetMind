@@ -110,12 +110,10 @@ export default function AdminAppLayout({ nav, brand, subtitle, children }) {
 
     return (
         <div className="flex min-h-screen bg-muted/20">
-            {/* Desktop sidebar */}
             <aside className={cn("fixed inset-y-0 left-0 z-30 hidden w-64 shrink-0 flex-col lg:flex lg:w-[20%]", sidebarBg)}>
                 {sidebar}
             </aside>
 
-            {/* Mobile overlay */}
             {mobileOpen && (
                 <div className="fixed inset-0 z-40 flex lg:hidden">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeMobile} />
@@ -125,7 +123,6 @@ export default function AdminAppLayout({ nav, brand, subtitle, children }) {
                 </div>
             )}
 
-            {/* Mobile topbar */}
             <div className={cn("fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b px-4 lg:hidden bg-gradient-to-br from-sidebar-from to-sidebar-to", borderTone)}>
                 <button
                     onClick={() => setMobileOpen(true)}
@@ -141,7 +138,6 @@ export default function AdminAppLayout({ nav, brand, subtitle, children }) {
                 )}
             </div>
 
-            {/* Content */}
             <div className="min-w-0 flex-1">
                 <main className="mx-auto max-w-6xl px-2 py-8 pt-[calc(3.5rem+2rem)] sm:px-6 lg:pt-8">
                     {children}

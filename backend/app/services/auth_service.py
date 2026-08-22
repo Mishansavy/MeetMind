@@ -60,8 +60,7 @@ async def login_user(payload: LoginRequest, db: AsyncSession) -> dict:
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
-    # Combine "user not found" and "wrong password" into one error message to prevent
-    # user enumeration, an attacker shouldn't be able to tell which one failed.
+    # one message for both cases, so the response can't be used to enumerate users
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
     if not user.is_email_verified:
@@ -77,16 +76,14 @@ async def request_otp(email: str, db: AsyncSession) -> dict:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    # Return the same message regardless of whether the email exists, prevents
-    # attackers from probing which email addresses are registered.
+    # same message whether or not the email exists
     if not user or not user.is_active:
         return {"message": "If that email is registered, a code has been sent."}
     if not user.is_email_verified or not user.is_approved:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account not active.")
 
     otp = f"{secrets.randbelow(1_000_000):06d}"
-    # Store a bcrypt hash of the OTP, if the DB is ever compromised, raw codes
-    # are not exposed. 10-minute window balances convenience against brute-force risk.
+    # hashed so a DB leak doesn't expose live codes
     user.otp_code = hash_password(otp)
     user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     await db.commit()
@@ -99,8 +96,7 @@ async def verify_otp(email: str, otp: str, db: AsyncSession) -> dict:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    # Single exception object, ensures timing and error message are identical
-    # whether the user doesn't exist, the code expired, or the code is wrong.
+    # one exception for every failure mode, so responses stay indistinguishable
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired code.")
 
     if not user or not user.otp_code or not user.otp_expires_at:
@@ -110,7 +106,7 @@ async def verify_otp(email: str, otp: str, db: AsyncSession) -> dict:
     if not verify_password(otp, user.otp_code):
         raise invalid
 
-    # Invalidate the OTP immediately so it can't be replayed.
+    # burn the code so it can't be replayed
     user.otp_code = None
     user.otp_expires_at = None
     await db.commit()
@@ -122,18 +118,16 @@ async def verify_otp(email: str, otp: str, db: AsyncSession) -> dict:
 async def forgot_password(email: str, db: AsyncSession) -> dict:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
-    # Only send if the account exists and is verified, unverified accounts
-    # shouldn't be able to reset passwords and bypass email verification.
+    # unverified accounts must not reset their way past email verification
     if user and user.is_active and user.is_email_verified:
         token = create_password_reset_token(user.email)
         send_password_reset_email(user.email, token)
-    # Always return the same response, same enumeration-prevention reason as OTP.
     return {"message": "If that email is registered, a reset link has been sent."}
 
 
 async def reset_password(token: str, new_password: str, db: AsyncSession) -> dict:
     payload = decode_token(token)
-    # invite doubles as first-time password set for admin-created employees.
+    # invite doubles as first-time password set for admin-created employees
     if not payload or payload.get("type") not in ("password_reset", "invite"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link.")
 

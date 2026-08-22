@@ -1,12 +1,6 @@
-"""
-Shared fixtures for the test suite.
-
-Each test function gets a fresh async engine and transaction that is rolled back
-on teardown, tests are isolated without dropping/recreating tables between them.
-
-The test database (meetmind_test) is created once via a synchronous psycopg2
-connection so we avoid asyncpg event-loop-scope issues at session level.
-"""
+"""Shared fixtures. Each test gets its own engine and a transaction rolled back
+on teardown. The test DB is created via psycopg2 to dodge asyncpg event-loop
+scoping at session level."""
 
 import os
 
@@ -18,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 DB_USER = os.environ.get("USER", "mishanrajshah")
 
-# Set env vars before any app module reads settings.
+# must precede any app import that reads settings
 os.environ.setdefault("DATABASE_URL", f"postgresql://{DB_USER}@localhost:5432/meetmind_test")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("SMTP_HOST", "smtp.gmail.com")
@@ -34,7 +28,7 @@ TEST_DB_URL = f"postgresql+asyncpg://{DB_USER}@localhost:5432/meetmind_test"
 
 
 def pytest_configure(config):
-    """Create the test database and schema once before any tests run (synchronous)."""
+    """Create the test database once, before any test runs."""
     conn = psycopg2.connect(user=DB_USER, dbname="postgres", host="localhost", port=5432)
     conn.autocommit = True
     cur = conn.cursor()
@@ -47,7 +41,7 @@ def pytest_configure(config):
 
 @pytest_asyncio.fixture
 async def db_session():
-    """Fresh engine + rolled-back transaction per test for full isolation."""
+    """Fresh engine and rolled-back transaction per test."""
     engine = create_async_engine(TEST_DB_URL, echo=False)
     async with engine.begin() as setup_conn:
         await setup_conn.run_sync(Base.metadata.create_all)
@@ -64,7 +58,7 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client(db_session):
-    """AsyncClient bound to the FastAPI app with the test session injected."""
+    """AsyncClient bound to the app with the test session injected."""
     async def override_get_db():
         yield db_session
 

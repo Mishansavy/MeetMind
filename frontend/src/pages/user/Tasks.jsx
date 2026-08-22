@@ -112,7 +112,7 @@ function NewTaskDialog({ open, onOpenChange, onCreated }) {
                             <Button type="button" variant="outline" size="sm">Cancel</Button>
                         </DialogClose>
                         <Button type="submit" size="sm" disabled={loading}>
-                            {loading ? "Saving…" : "Create task"}
+                            {loading ? "Saving..." : "Create task"}
                         </Button>
                     </div>
                 </form>

@@ -17,10 +17,10 @@ class Room(Base):
     title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     transcript: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    # Set when the first peer connects; used to compute meeting duration.
+    # set when the first peer connects, used for meeting duration
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    # Set when the admin closes the room or the last peer disconnects.
+    # set when the host closes the room or the last peer leaves
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    # Peak simultaneous participant count tracked by the WebSocket hub.
+    # peak concurrent participants, tracked by the signaling hub
     participant_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

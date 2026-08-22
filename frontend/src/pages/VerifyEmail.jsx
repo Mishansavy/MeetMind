@@ -8,7 +8,7 @@ import { Button } from "../components/ui/button";
 const STATES = {
   verifying: {
     icon: <Loader2 className="h-10 w-10 text-muted-foreground animate-spin" />,
-    title: "Verifying your email…",
+    title: "Verifying your email...",
     description: "This will only take a moment.",
   },
   success: {

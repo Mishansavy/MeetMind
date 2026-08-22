@@ -13,7 +13,6 @@ import { Label } from "../../components/ui/label";
 import { Badge } from "../../components/ui/badge";
 import { cn } from "../../lib/utils";
 
-// ── Step 1: meeting details form ──────────────────────────────────────────────
 function NewMeetingForm({ onCreated }) {
     const [title, setTitle] = useState("");
     const [date, setDate] = useState("");
@@ -62,7 +61,6 @@ function NewMeetingForm({ onCreated }) {
 
     return (
         <div className="max-w-lg space-y-6">
-            {/* Title */}
             <div className="space-y-1.5">
                 <Label htmlFor="mtitle">Meeting title <span className="text-destructive">*</span></Label>
                 <Input
@@ -74,7 +72,6 @@ function NewMeetingForm({ onCreated }) {
                 />
             </div>
 
-            {/* Date + Time */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                     <Label className="flex items-center gap-1.5">
@@ -104,7 +101,6 @@ function NewMeetingForm({ onCreated }) {
                 </p>
             )}
 
-            {/* Attendees */}
             <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -177,14 +173,13 @@ function NewMeetingForm({ onCreated }) {
             )}
 
             <Button onClick={handleCreate} disabled={creating} className="w-full sm:w-auto">
-                {creating ? "Creating…" : isNow ? "Create & start now" : "Save meeting"}
+                {creating ? "Creating..." : isNow ? "Create & start now" : "Save meeting"}
                 {!creating && <ArrowRight className="ml-2 h-4 w-4" />}
             </Button>
         </div>
     );
 }
 
-// ── Step 2: share screen ──────────────────────────────────────────────────────
 function ShareScreen({ room, isNow, onGoToRoom, onCreateAnother }) {
     const [copied, setCopied] = useState(false);
 
@@ -196,7 +191,6 @@ function ShareScreen({ room, isNow, onGoToRoom, onCreateAnother }) {
 
     return (
         <div className="max-w-md space-y-6">
-            {/* Room code card */}
             <div className="rounded-xl border border-border bg-muted/30 p-6 text-center space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Room code</p>
                 <p className="text-4xl font-mono font-bold tracking-[0.2em] mt-1">{room.room_code}</p>
@@ -213,7 +207,6 @@ function ShareScreen({ room, isNow, onGoToRoom, onCreateAnother }) {
                 )}
             </div>
 
-            {/* Actions */}
             <div className="space-y-2">
                 <Button variant="outline" className="w-full gap-2" onClick={copy}>
                     {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
@@ -246,7 +239,6 @@ function ShareScreen({ room, isNow, onGoToRoom, onCreateAnother }) {
     );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
 export default function JoinMeeting() {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -273,7 +265,7 @@ export default function JoinMeeting() {
 
     const Shell = isAdmin ? AdminShell : AppShell;
 
-    // ── New meeting form page ────────────────────────────────────────────────
+    // New meeting form page
     if (isAdmin && view === "new-meeting") {
         return (
             <Shell>
@@ -295,7 +287,7 @@ export default function JoinMeeting() {
         );
     }
 
-    // ── Share screen page ────────────────────────────────────────────────────
+    // Share screen page
     if (isAdmin && view === "share" && createdRoom) {
         return (
             <Shell>
@@ -315,7 +307,7 @@ export default function JoinMeeting() {
         );
     }
 
-    // ── Landing / join with code ─────────────────────────────────────────────
+    // Landing / join with code
     return (
         <Shell>
             <div className="mb-8">
