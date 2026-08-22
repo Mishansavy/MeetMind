@@ -16,39 +16,11 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/table";
 import { cn } from "../../lib/utils";
-import {
-    Dialog, DialogContent, DialogHeader, DialogTitle,
-    DialogDescription, DialogClose,
-} from "../../components/ui/dialog";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle,
     SheetDescription, SheetBody, SheetFooter,
 } from "../../components/ui/sheet";
-
-function ConfirmDialog({ open, onOpenChange, title, description, onConfirm }) {
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
-                </DialogHeader>
-                <div className="flex justify-end gap-2 mt-4">
-                    <DialogClose asChild>
-                        <Button variant="outline" size="sm">Cancel</Button>
-                    </DialogClose>
-                    <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => { onConfirm(); onOpenChange(false); }}
-                    >
-                        Confirm
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 function DetailRow({ icon: Icon, label, value }) {
     return (

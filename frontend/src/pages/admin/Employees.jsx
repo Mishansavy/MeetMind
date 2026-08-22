@@ -18,8 +18,9 @@ import {
     SheetBody, SheetFooter,
 } from "../../components/ui/sheet";
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../../components/ui/dialog";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 const EMPTY_NEW_EMPLOYEE = { name: "", email: "", employee_id: "", department: "", designation: "", join_date: "" };
 
@@ -362,24 +363,14 @@ export default function AdminEmployees() {
             />
 
             {confirm && (
-                <Dialog open onOpenChange={(v) => !v && setConfirm(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Remove employee</DialogTitle>
-                            <DialogDescription>
-                                Are you sure you want to remove {confirm.name}? This cannot be undone.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex justify-end gap-2 mt-4">
-                            <DialogClose asChild>
-                                <Button variant="outline" size="sm">Cancel</Button>
-                            </DialogClose>
-                            <Button size="sm" variant="destructive" onClick={() => { handleRemove(confirm.id); setConfirm(null); }}>
-                                Remove
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <ConfirmDialog
+                    open
+                    onOpenChange={(v) => !v && setConfirm(null)}
+                    title="Remove employee"
+                    description={`Are you sure you want to remove ${confirm.name}? This cannot be undone.`}
+                    confirmLabel="Remove"
+                    onConfirm={() => handleRemove(confirm.id)}
+                />
             )}
         </AdminShell>
     );
