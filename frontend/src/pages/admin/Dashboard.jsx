@@ -22,7 +22,7 @@ import {
 } from "../../components/ui/dialog";
 import {
     Sheet, SheetContent, SheetHeader, SheetTitle,
-    SheetDescription, SheetBody, SheetFooter, SheetClose,
+    SheetDescription, SheetBody, SheetFooter,
 } from "../../components/ui/sheet";
 
 function ConfirmDialog({ open, onOpenChange, title, description, onConfirm }) {

@@ -1,9 +1,8 @@
-"""Tests for pure utility functions in app/utils/security.py, no DB required."""
+"""Tests for the pure helpers in app/utils/security.py. No DB."""
 
 import time
 from datetime import datetime, timedelta, timezone
 
-import pytest
 from jose import jwt
 
 from app.utils.security import (

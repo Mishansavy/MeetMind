@@ -2,8 +2,6 @@
 
 from datetime import date, timedelta
 
-import pytest
-
 from app.services.nlp_service import extract_tasks_ner, urgency_score
 from app.models.task import TaskPriority
 

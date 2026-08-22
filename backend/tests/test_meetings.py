@@ -1,6 +1,5 @@
 """Integration tests for meeting notes endpoints."""
 
-from unittest.mock import patch
 import io
 
 import pytest

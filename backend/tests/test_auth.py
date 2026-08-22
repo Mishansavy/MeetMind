@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
 
 from app.models.user import User, UserRole
 from app.utils.security import hash_password, create_access_token
