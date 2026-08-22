@@ -150,5 +150,5 @@ docs/
 *.nav
 *.snm
 *.vrb
-.out
+*.out
 .pdf
