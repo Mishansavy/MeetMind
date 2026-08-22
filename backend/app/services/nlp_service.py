@@ -16,7 +16,7 @@ _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 # Lines matching any of these verbs are treated as action items.
 # "needs? to" covers both "need to" and "needs to".
 _ACTION_RE = re.compile(
-    r"\b(will|should|must|needs?\s+to|assigned\s+to|action\s+item|to[- ]do|follow[- ]up)\b",
+    r"\b(will|(?:i|we|you|he|she|they)'ll|should|must|needs?\s+to|assigned\s+to|action\s+item|to[- ]do|follow[- ]up)\b",
     re.IGNORECASE,
 )
 
