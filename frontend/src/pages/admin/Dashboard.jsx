@@ -159,7 +159,7 @@ export default function AdminDashboard() {
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
-                                                                onClick={() => setConfirm({ id: u.id, name: u.name, action: "reject" })}
+                                                                onClick={() => setConfirm({ id: u.id, name: u.name })}
                                                                 className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
                                                             >
                                                                 <Trash2 className="h-3 w-3" /> Reject
@@ -236,8 +236,9 @@ export default function AdminDashboard() {
                 <ConfirmDialog
                     open
                     onOpenChange={(open) => !open && setConfirm(null)}
-                    title={confirm.action === "reject" ? "Reject request" : "Remove member"}
-                    description={`Are you sure you want to ${confirm.action} ${confirm.name}? This cannot be undone.`}
+                    title="Reject request"
+                    description={`Are you sure you want to reject ${confirm.name}? This cannot be undone.`}
+                    confirmLabel="Reject"
                     onConfirm={() => handleRemove(confirm.id)}
                 />
             )}
