@@ -21,6 +21,8 @@ codebase/
 - Automated email reminders 24h before task deadlines (APScheduler)
 - Analytics dashboard: meetings per week, task completion trends
 - Live meetings via WebRTC + PeerJS with in-process WebSocket signaling
+- Meeting recordings, playback, and sharing with any user by email
+- Employee records and daily check-in/check-out attendance
 - Admin can approve, reject, and remove members
 
 ---
@@ -108,14 +110,14 @@ App runs at `http://localhost:5173`.
 
 ## Creating an admin account
 
-Use the seed script, it creates the default admin and is safe to re-run (skips existing users):
+Set the admin credentials in `.env`, then run the seed script. It is safe to re-run:
 
 ```bash
 cd backend
 python seed.py
 ```
 
-To add more admins, edit the `ADMINS` list in `backend/seed.py` before running.
+Reads `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `ADMIN_NAME`, and skips the user if it already exists.
 
 ---
 
@@ -143,7 +145,12 @@ cd frontend
 npm run dev -- --host
 ```
 
-**4. Update the API base URL** in `frontend/src/api/axios.js` and the WebSocket URL in `frontend/src/pages/user/MeetingRoom.jsx`, replace `localhost` with your machine's IP (e.g. `192.168.x.x`).
+**4. Point the frontend at your machine's IP** by adding a `frontend/.env` file:
+
+```
+VITE_API_URL=http://192.168.x.x:8000/api/v1
+VITE_WS_URL=ws://192.168.x.x:8000/api/v1
+```
 
 Then open `http://192.168.x.x:5173` on any device on the same network.
 

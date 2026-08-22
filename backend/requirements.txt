@@ -15,6 +15,7 @@ pydantic[email]
 pydantic-settings
 alembic
 pymupdf
+python-dateutil
 spacy
 apscheduler
 openai-whisper

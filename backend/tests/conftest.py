@@ -10,7 +10,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-DB_USER = os.environ.get("USER", "mishanrajshah")
+DB_USER = os.environ.get("PGUSER") or os.environ.get("USER", "postgres")
 
 # must precede any app import that reads settings
 os.environ.setdefault("DATABASE_URL", f"postgresql://{DB_USER}@localhost:5432/meetmind_test")
