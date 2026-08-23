@@ -2,6 +2,10 @@
 
 A team meeting intelligence tool. Records, transcribes, and summarizes meetings, and assigns action items automatically. Built as a college project.
 
+<img width="1920" height="1070" alt="meetmind-dashboard-mishan-shah-mishansavy" src="https://github.com/user-attachments/assets/70e58e5b-623c-4a9e-a145-c34e4188ae7f" />
+
+
+
 ---
 
 ## What's in here
